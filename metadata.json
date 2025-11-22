@@ -1,7 +1,5 @@
 {
   "name": "Math Adventure: Equation Explorer",
-  "description": "A fun, interactive app for elementary students to learn algebraic equations using the step-by-step ladder method, powered by Gemini AI.",
-  "requestFramePermissions": [
-    "microphone"
-  ]
+  "description": "A fun, interactive app for elementary students to learn algebraic equations using the step-by-step ladder method.",
+  "requestFramePermissions": []
 }

@@ -1,52 +1,50 @@
 export const STRINGS = {
   appTitle: "方程大冒险",
-  subTitle: "选择难度，开始你的数学探险之旅！",
+  subTitle: "生活中的数学挑战，等你来解！",
   levels: {
-    easy: "简单 (入门)",
-    medium: "中等 (进阶)",
-    hard: "困难 (挑战)"
+    easy: "生活基础 (简单)",
+    medium: "商业逻辑 (中等)",
+    hard: "复杂推理 (困难)"
   },
   steps: {
-    define: "设未知数",
-    build: "列方程",
-    solve: "解方程"
+    define: "第一步：设未知数",
+    build: "第二步：列方程",
+    solve: "第三步：解方程"
   },
   actions: {
-    backToMenu: "返回主菜单",
-    next: "下一步",
-    confirmVar: "确认，去列方程",
-    hint: "💡 提示",
+    backToMenu: "返回菜单",
+    next: "下一题 →",
+    prev: "← 上一题",
+    confirmVar: "设定完成",
+    hint: "💡 给我一点提示",
     submitEq: "提交方程",
     submitAns: "提交答案",
-    retry: "再来一题",
+    retry: "再试一次",
     home: "返回主页",
-    askAI: "AI 老师讲解",
-    send: "发送",
     close: "关闭"
   },
   feedback: {
-    loading: "题目正在光速生成中...",
-    definePrompt: "这道题里，我们不知道的数是什么呢？",
-    defineAction: "我知道了！",
-    defineDone: "AI老师已经帮你写好了“解：设...”，接下来最关键咯！",
-    buildPrompt: "找出等量关系，用 x 表示出来。",
-    buildPlaceholder: "例如: 2x + 5 = 15",
-    solvePrompt: "现在解开这个方程吧。",
+    loading: "正在寻找有趣的数学挑战...",
+    definePrompt: "仔细阅读题目，我们要求的未知数是什么？",
+    defineAction: "我找到未知数了！",
+    defineDone: "非常好！既然设定了未知数 x，那就要找出题目中的【等量关系】。",
+    buildPrompt: "根据题目中的数量关系，列出一个方程。",
+    buildPlaceholder: "例如: 3x + 5 = 20",
+    solvePrompt: "现在，请计算出 x 等于多少。",
     successTitle: "挑战成功!",
-    successMsg: "你太厉害了！完全掌握了这个知识点。",
-    errorEq: "方程好像不太对哦，左右两边相等吗？",
-    errorAns: "再试一次哦，计算可能有点小误差。",
-    correctEq: "太棒了！方程是正确的！"
+    successMsg: "逻辑非常清晰！你已经掌握了解决这类问题的方法。",
+    errorEq: "方程好像不太对。请检查题目中的固定数值和变化数值是否都用上了？",
+    errorAns: "计算结果有点小误差，请检查一下算术过程。",
+    correctEq: "太棒了！这个方程准确描述了题目中的关系！"
   },
-  chat: {
-    title: "AI 数学辅导员",
-    placeholder: "哪里不懂？可以直接问我哦...",
-    intro: "你好！我是你的 AI 老师。这道题哪里觉得难呢？我可以给你讲讲思路！(不需要直接告诉我答案哦)",
-    thinking: "正在思考...",
-    listening: "正在听...",
-    noVoice: "您的浏览器不支持语音输入，请使用 Chrome 或 Safari。"
-  },
-  problemLabel: "应用题",
+  problemLabel: "生活应用题",
   solutionLabel: "解：",
-  fullSolution: "完整解题过程："
+  fullSolution: "参考解析：",
+  chat: {
+    title: "AI 辅导老师",
+    intro: "你好！我是你的专属 AI 辅导老师。关于这道题，哪里不懂都可以问我哦！",
+    placeholder: "请输入你的问题...",
+    listening: "正在听你说...",
+    noVoice: "抱歉，你的浏览器不支持语音识别功能。"
+  }
 };

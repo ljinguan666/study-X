@@ -4,15 +4,18 @@ import { generateProblem, validateEquation, checkAnswer } from './services/gemin
 import { Button } from './components/Button';
 import { ProgressBar } from './components/ProgressBar';
 import { Character } from './components/Character';
-import { ChatAssistant } from './components/ChatAssistant';
 import { STRINGS } from './locales';
 
 export default function App() {
   const [step, setStep] = useState<GameStep>(GameStep.MENU);
   const [difficulty, setDifficulty] = useState<Difficulty>(Difficulty.EASY);
-  const [problem, setProblem] = useState<MathProblem | null>(null);
-  const [loading, setLoading] = useState(false);
+  
+  // Problem History Management
+  const [history, setHistory] = useState<MathProblem[]>([]);
+  const [currentIndex, setCurrentIndex] = useState<number>(-1);
   const [seenSignatures, setSeenSignatures] = useState<Set<string>>(new Set());
+  
+  const [loading, setLoading] = useState(false);
   
   // User inputs
   const [userEquation, setUserEquation] = useState("");
@@ -22,29 +25,31 @@ export default function App() {
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState<'info' | 'error' | 'success'>('info');
 
-  // Chat State
-  const [isChatOpen, setIsChatOpen] = useState(false);
+  const currentProblem = currentIndex >= 0 && currentIndex < history.length ? history[currentIndex] : null;
 
-  const startGame = async (selectedDifficulty: Difficulty) => {
+  // --- Game Logic ---
+
+  const startNewGame = async (selectedDifficulty: Difficulty) => {
     setDifficulty(selectedDifficulty);
     setStep(GameStep.LOADING);
     setLoading(true);
     setMessage(STRINGS.feedback.loading);
-    setIsChatOpen(false); 
     
     try {
       const newProblem = await generateProblem(selectedDifficulty, seenSignatures);
       
-      // Update history
-      const newHistory = new Set(seenSignatures);
-      newHistory.add(newProblem.signature);
-      setSeenSignatures(newHistory);
+      // Update signatures to prevent duplicates
+      const newHistorySignatures = new Set(seenSignatures);
+      newHistorySignatures.add(newProblem.signature);
+      setSeenSignatures(newHistorySignatures);
 
-      setProblem(newProblem);
-      setStep(GameStep.READ_PROBLEM);
-      setUserEquation("");
-      setUserAnswer("");
-      setMessage("");
+      // Add to history and set as current
+      const newHistory = [...history, newProblem];
+      setHistory(newHistory);
+      setCurrentIndex(newHistory.length - 1);
+
+      // Reset interaction state
+      resetInteractionState();
     } catch (error) {
       setMessage("Error generating problem.");
       setStep(GameStep.MENU);
@@ -52,6 +57,36 @@ export default function App() {
       setLoading(false);
     }
   };
+
+  const resetInteractionState = () => {
+    setStep(GameStep.READ_PROBLEM);
+    setUserEquation("");
+    setUserAnswer("");
+    setMessage("");
+    setMessageType('info');
+  };
+
+  // --- Navigation Logic ---
+
+  const handleNext = async () => {
+    // If we are at the end of history, generate new.
+    if (currentIndex === history.length - 1) {
+      await startNewGame(difficulty);
+    } else {
+      // Move forward in history
+      setCurrentIndex(prev => prev + 1);
+      resetInteractionState();
+    }
+  };
+
+  const handlePrev = () => {
+    if (currentIndex > 0) {
+      setCurrentIndex(prev => prev - 1);
+      resetInteractionState();
+    }
+  };
+
+  // --- Gameplay Actions ---
 
   const handleDefineVar = () => {
     setStep(GameStep.DEFINE_VAR);
@@ -64,12 +99,11 @@ export default function App() {
   };
 
   const handleCheckEquation = async () => {
-    if (!userEquation.trim() || !problem) return;
+    if (!userEquation.trim() || !currentProblem) return;
     
     setLoading(true);
-    
     try {
-      const result = await validateEquation(problem, userEquation);
+      const result = await validateEquation(currentProblem, userEquation);
       if (result.correct) {
         setMessage(result.feedback);
         setMessageType('success');
@@ -91,16 +125,15 @@ export default function App() {
   };
 
   const handleCheckAnswer = () => {
-    if (!userAnswer || !problem) return;
+    if (!userAnswer || !currentProblem) return;
     
     const numAns = parseFloat(userAnswer);
-    const result = checkAnswer(problem, numAns);
+    const result = checkAnswer(currentProblem, numAns);
     
     if (result.correct) {
       setStep(GameStep.SUCCESS);
       setMessage(result.feedback);
       setMessageType('success');
-      // Trigger global confetti function attached to window
       if ((window as any).triggerConfetti) {
         (window as any).triggerConfetti();
       }
@@ -110,14 +143,15 @@ export default function App() {
     }
   };
 
-  const resetGame = () => {
+  const goHome = () => {
     setStep(GameStep.MENU);
-    setProblem(null);
+    setHistory([]);
+    setCurrentIndex(-1);
     setMessage("");
-    setIsChatOpen(false);
   };
 
-  // Render Helpers
+  // --- Render Helpers ---
+
   const renderMenu = () => (
     <div className="flex flex-col items-center space-y-8 animate-fade-in w-full max-w-md">
       <Character emotion="happy" />
@@ -129,13 +163,13 @@ export default function App() {
       </div>
       
       <div className="grid grid-cols-1 gap-4 w-full">
-        <Button onClick={() => startGame(Difficulty.EASY)} variant="success" size="lg" className="shadow-xl border-green-600">
+        <Button onClick={() => startNewGame(Difficulty.EASY)} variant="success" size="lg" className="shadow-xl border-green-600">
           {STRINGS.levels.easy}
         </Button>
-        <Button onClick={() => startGame(Difficulty.MEDIUM)} variant="primary" size="lg" className="shadow-xl border-blue-600">
+        <Button onClick={() => startNewGame(Difficulty.MEDIUM)} variant="primary" size="lg" className="shadow-xl border-blue-600">
           {STRINGS.levels.medium}
         </Button>
-        <Button onClick={() => startGame(Difficulty.HARD)} variant="secondary" size="lg" className="shadow-xl border-purple-600">
+        <Button onClick={() => startNewGame(Difficulty.HARD)} variant="secondary" size="lg" className="shadow-xl border-purple-600">
           {STRINGS.levels.hard}
         </Button>
       </div>
@@ -143,33 +177,35 @@ export default function App() {
   );
 
   const renderProblemCard = () => {
-    if (!problem) return null;
+    if (!currentProblem) return null;
     return (
-      <div className="glass-panel p-6 rounded-3xl shadow-2xl w-full max-w-2xl mb-6 relative transform transition-all hover:scale-[1.01]">
+      <div className="glass-panel p-6 rounded-3xl shadow-2xl w-full max-w-3xl mb-6 relative transition-all">
         <div className="absolute -top-4 left-6 bg-yellow-400 text-yellow-900 px-4 py-1 rounded-full font-bold text-sm shadow-md border border-yellow-200">
-          {STRINGS.problemLabel}
+          {STRINGS.problemLabel} #{currentIndex + 1}
         </div>
-        <p className="text-xl md:text-2xl text-gray-800 leading-relaxed mt-2 font-medium">
-          {problem.story} <br/>
-          <span className="font-bold text-blue-600 block mt-3">{problem.question}</span>
+        <p className="text-xl md:text-2xl text-gray-800 leading-relaxed mt-2 font-medium text-justify">
+          {currentProblem.story}
         </p>
+        <div className="mt-4 p-4 bg-blue-50 rounded-xl border border-blue-100">
+           <span className="font-bold text-blue-600 text-xl">❓ 问题：{currentProblem.question}</span>
+        </div>
       </div>
     );
   };
 
   return (
     <div className="min-h-screen flex flex-col font-sans text-gray-800 relative z-10">
-      {/* Header - Removed 'sticky' and 'top-0' to fix blocking issue on small screens */}
+      {/* Header */}
       <header className="p-4 w-full z-20">
-        <div className="max-w-4xl mx-auto flex justify-between items-center bg-white/90 backdrop-blur-md rounded-full px-6 py-3 shadow-lg">
-          <div className="flex items-center gap-2 cursor-pointer hover:scale-105 transition-transform" onClick={resetGame}>
+        <div className="max-w-5xl mx-auto flex justify-between items-center bg-white/90 backdrop-blur-md rounded-full px-6 py-3 shadow-lg">
+          <div className="flex items-center gap-2 cursor-pointer hover:scale-105 transition-transform" onClick={goHome}>
             <span className="text-2xl">🚀</span>
             <span className="font-bold text-xl text-blue-700 hidden sm:block">{STRINGS.appTitle}</span>
           </div>
           
           <div className="flex gap-3">
              {step > GameStep.MENU && (
-                <Button variant="primary" size="sm" onClick={resetGame}>
+                <Button variant="primary" size="sm" onClick={goHome}>
                   {STRINGS.actions.home}
                 </Button>
              )}
@@ -178,7 +214,7 @@ export default function App() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col items-center p-4 md:p-8 w-full max-w-4xl mx-auto">
+      <main className="flex-1 flex flex-col items-center p-4 md:p-8 w-full max-w-5xl mx-auto">
         
         {step === GameStep.MENU && renderMenu()}
         
@@ -190,17 +226,41 @@ export default function App() {
           </div>
         )}
 
-        {step > GameStep.LOADING && problem && (
+        {step > GameStep.LOADING && currentProblem && (
           <div className="w-full flex flex-col items-center space-y-6 animate-fade-in">
             
             <ProgressBar currentStep={step} />
             
-            {renderProblemCard()}
+            {/* Navigation Container */}
+            <div className="w-full flex items-center justify-between gap-4">
+               <Button 
+                 onClick={handlePrev} 
+                 disabled={currentIndex === 0 || loading}
+                 className={`rounded-full w-12 h-12 md:w-auto md:px-6 flex items-center justify-center ${currentIndex === 0 ? 'opacity-0 pointer-events-none' : ''}`}
+                 variant="secondary"
+               >
+                 <span className="hidden md:inline">{STRINGS.actions.prev}</span>
+                 <span className="md:hidden">←</span>
+               </Button>
 
-            {/* Game Steps Logic */}
+               <div className="flex-1 flex justify-center">
+                  {renderProblemCard()}
+               </div>
+
+               <Button 
+                 onClick={handleNext} 
+                 disabled={loading}
+                 className="rounded-full w-12 h-12 md:w-auto md:px-6 flex items-center justify-center shadow-lg hover:scale-105 transition-transform bg-orange-500 border-orange-600 hover:bg-orange-600"
+               >
+                 <span className="hidden md:inline">{STRINGS.actions.next}</span>
+                 <span className="md:hidden">→</span>
+               </Button>
+            </div>
+
+            {/* Game Interaction Area */}
             <div className="w-full max-w-2xl glass-panel rounded-3xl p-6 shadow-xl relative">
               
-              {/* Step 1: Read & Define Unknown */}
+              {/* Step 1: Define */}
               {step === GameStep.READ_PROBLEM && (
                 <div className="text-center space-y-6">
                   <Character emotion="waiting" />
@@ -216,7 +276,7 @@ export default function App() {
                   <Character emotion="thinking" />
                   <h3 className="text-2xl font-bold text-indigo-700">{STRINGS.steps.define}</h3>
                   <div className="bg-indigo-50 p-4 rounded-xl text-xl font-mono text-indigo-800 inline-block border-2 border-indigo-100 shadow-inner">
-                     {STRINGS.solutionLabel} {problem.unknownDefinition}
+                     {STRINGS.solutionLabel} {currentProblem.unknownDefinition}
                   </div>
                   <p className="text-gray-500 text-sm">{STRINGS.feedback.defineDone}</p>
                   <Button onClick={confirmVar} variant="success" className="w-full md:w-auto mx-auto shadow-lg">
@@ -225,7 +285,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* Step 2: Build Equation */}
+              {/* Step 2: Build */}
               {step === GameStep.BUILD_EQUATION && (
                 <div className="text-center space-y-6 animate-slide-up">
                    <div className="flex justify-center items-center gap-4">
@@ -237,7 +297,6 @@ export default function App() {
                    </div>
 
                    <div className="chalkboard p-6 rounded-xl shadow-inner text-left relative overflow-hidden group">
-                      <div className="absolute inset-0 bg-white opacity-5 pointer-events-none group-hover:opacity-10 transition-opacity"></div>
                       <input 
                         type="text" 
                         value={userEquation}
@@ -255,7 +314,7 @@ export default function App() {
 
                    <div className="flex gap-4 justify-center">
                      <Button 
-                       onClick={() => setMessage(`${STRINGS.actions.hint}: ${problem.hint}`)} 
+                       onClick={() => setMessage(`${STRINGS.actions.hint}: ${currentProblem.hint}`)} 
                        variant="secondary" 
                        size="sm"
                        disabled={loading}
@@ -275,7 +334,7 @@ export default function App() {
                   <div className="flex flex-col items-center">
                     <h3 className="text-2xl font-bold text-indigo-700 mb-2">{STRINGS.steps.solve}</h3>
                     <div className="bg-gray-800 text-white px-6 py-3 rounded-lg text-2xl font-mono shadow-md mb-4">
-                      {problem.equation}
+                      {currentProblem.equation}
                     </div>
                   </div>
 
@@ -314,15 +373,17 @@ export default function App() {
                   <div className="bg-green-50 p-6 rounded-2xl border-2 border-green-100 shadow-inner">
                     <p className="font-bold text-green-800 mb-2 uppercase text-sm tracking-wider">{STRINGS.fullSolution}</p>
                     <div className="font-mono text-lg text-left whitespace-pre-line leading-relaxed text-gray-700">
-                      <p>{STRINGS.solutionLabel} {problem.unknownDefinition}</p>
-                      <p>Equation: {problem.equation}</p>
-                      <p>x = {problem.answer}</p>
+                      <p>{STRINGS.solutionLabel} {currentProblem.unknownDefinition}</p>
+                      <p>方程: {currentProblem.equation}</p>
+                      <p>x = {currentProblem.answer}</p>
                     </div>
                   </div>
 
                   <div className="flex justify-center gap-4">
-                    <Button onClick={resetGame} variant="secondary" className="shadow-lg">{STRINGS.actions.home}</Button>
-                    <Button onClick={() => startGame(difficulty)} variant="primary" className="shadow-lg">{STRINGS.actions.retry}</Button>
+                    <Button onClick={goHome} variant="secondary" className="shadow-lg">{STRINGS.actions.home}</Button>
+                    <Button onClick={handleNext} variant="primary" className="shadow-lg flex items-center gap-2">
+                       {STRINGS.actions.next}
+                    </Button>
                   </div>
                 </div>
               )}
@@ -331,33 +392,6 @@ export default function App() {
           </div>
         )}
       </main>
-
-      {/* AI Chat Floating Button (Only valid when problem is active) */}
-      {step > GameStep.LOADING && problem && (
-        <div className="fixed bottom-6 right-6 z-40">
-          {!isChatOpen && (
-            <button 
-              onClick={() => setIsChatOpen(true)}
-              className="bg-white/80 backdrop-blur-md hover:scale-110 transition-transform p-2 rounded-full shadow-2xl border-2 border-indigo-200 group flex items-center gap-2 pr-5"
-            >
-              <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-2xl shadow-lg group-hover:rotate-12 transition-transform">
-                🤖
-              </div>
-              <div className="text-left">
-                <span className="block text-xs text-gray-500 font-bold uppercase tracking-wider">求助</span>
-                <span className="block text-sm font-bold text-indigo-700">{STRINGS.actions.askAI}</span>
-              </div>
-            </button>
-          )}
-          
-          {/* Chat Component */}
-          <ChatAssistant 
-            problem={problem} 
-            isOpen={isChatOpen} 
-            onClose={() => setIsChatOpen(false)} 
-          />
-        </div>
-      )}
     </div>
   );
 }

@@ -8,7 +8,7 @@ interface Template {
   question: (v: any) => string;
   unknown: (v: any) => string;
   hint: (v: any) => string;
-  gen: () => any; // Generates the numbers
+  gen: () => any;
 }
 
 // --- Templates ---
@@ -16,157 +16,158 @@ interface Template {
 const templates: Record<Difficulty, Template[]> = {
   [Difficulty.EASY]: [
     {
-      // Type: x + a = b (Growth/Addition)
-      // Scenario: Plant height / Height growth
+      // Scenario: Environmental / Recycling
+      // Logic: x * a = b (Multiplication)
       gen: () => {
-        const x = randomInt(10, 60); // Original height
-        const a = randomInt(5, 25);  // Grown amount
-        const b = x + a;             // Current height
+        const x = randomInt(15, 40); // Bottles per student
+        const a = randomInt(4, 8);   // Number of students
+        const b = x * a;             // Total
         return { x, a, b };
       },
-      story: (v) => `学校生物角种了一棵向日葵。上个月它长高了 ${v.a} 厘米，现在的总高度是 ${v.b} 厘米。`,
-      question: () => "这棵向日葵原来有多高？",
-      unknown: () => "设向日葵原来高度为 x 厘米",
-      hint: (v) => `原来的高度 + 长高的高度 (${v.a}) = 现在的高度`
+      story: (v) => `为了保护环境，学校环保小组的 ${v.a} 名同学去海边捡塑料瓶。大家非常努力，平均每人捡了同样数量的瓶子，最后清点发现一共有 ${v.b} 个塑料瓶。`,
+      question: () => "平均每位同学捡了多少个瓶子？",
+      unknown: () => "设平均每人捡了 x 个",
+      hint: (v) => `人数 × 每人捡的数量 = 总数量`
     },
     {
-      // Type: x - a = b (Spending/Consumption)
-      // Scenario: Pocket money
+      // Scenario: Library / Reading
+      // Logic: a + x = b (Addition)
       gen: () => {
-        const x = randomInt(25, 120); // Original money
-        const a = randomInt(6, 20);   // Spent
-        const b = x - a;              // Left
-        return { x, a, b };
+        const a = randomInt(20, 50); // Pages read previously
+        const x = randomInt(10, 30); // Pages read today
+        const b = a + x;             // Total pages
+        return { a, x, b };
       },
-      story: (v) => `小明带了一些零花钱去书店。他买了一本漫画书花了 ${v.a} 元，钱包里还剩下 ${v.b} 元。`,
-      question: () => "小明原来带了多少钱？",
-      unknown: () => "设小明原来带了 x 元",
-      hint: (v) => `原来的钱 - 花掉的钱 = 剩下的钱`
+      story: (v) => `小明正在读一本《科学百科》。前几天他已经读了 ${v.a} 页，今天他又读了一些，现在正好读到了第 ${v.b} 页。`,
+      question: () => "小明今天读了多少页？",
+      unknown: () => "设今天读了 x 页",
+      hint: (v) => `之前读的页数 + 今天读的页数 = 现在的总页数`
     },
     {
-      // Type: ax = b (Division/Sharing)
-      // Scenario: Rectangular Area or Grouping
+      // Scenario: Cooking / Recipes
+      // Logic: b - x = a (Subtraction)
       gen: () => {
-        const x = randomInt(5, 15); // Width or Count
-        const a = randomInt(4, 9);  // Length or Price
-        const b = a * x;            // Total
-        return { x, a, b };
+        const b = randomInt(500, 1000); // Total flour
+        const x = randomInt(200, 400);  // Used
+        const a = b - x;                // Left
+        return { b, x, a };
       },
-      story: (v) => `李老师买了 ${v.a} 盒同样的彩笔作为奖品，一共支付了 ${v.b} 元。`,
-      question: () => "每盒彩笔多少钱？",
-      unknown: () => "设每盒彩笔 x 元",
-      hint: (v) => `盒数 × 单价 = 总价`
+      story: (v) => `妈妈准备做蛋糕，厨房里的一袋面粉原本有 ${v.b} 克。倒出一部分做蛋糕后，称了一下，袋子里还剩下 ${v.a} 克面粉。`,
+      question: () => "做蛋糕用掉了多少克面粉？",
+      unknown: () => "设用掉了 x 克",
+      hint: (v) => `原有的重量 - 用掉的重量 = 剩下的重量`
     }
   ],
   [Difficulty.MEDIUM]: [
     {
-      // Type: ax + b = c
-      // Scenario: Taxi Fare (Start fee + mileage)
+      // Scenario: Online Shopping
+      // Logic: ax + b = c (Price * Qty + Shipping = Total)
       gen: () => {
-        const x = randomInt(5, 30); // Distance (km)
-        const a = randomInt(2, 5);  // Price per km
-        const b = randomInt(8, 18); // Base fare
-        const c = a * x + b;        // Total fare
+        const x = randomInt(15, 45); // Price per book
+        const a = randomInt(3, 6);   // Quantity
+        const b = randomInt(6, 12);  // Shipping fee
+        const c = a * x + b;         // Total
         return { x, a, b, c };
       },
-      story: (v) => `小红坐出租车回家。出租车的起步价是 ${v.b} 元，之后每公里收 ${v.a} 元。小红一共付了 ${v.c} 元。`,
-      question: () => "小红坐了多少公里？",
-      unknown: () => "设行程为 x 公里",
-      hint: (v) => `(每公里价格 × 公里数) + 起步价 = 总费用`
+      story: (v) => `小红在网上书店买了 ${v.a} 本同样的故事书。除了书款外，还需要支付 ${v.b} 元的快递费。最后付款总额是 ${v.c} 元。`,
+      question: () => "一本故事书的价格是多少？",
+      unknown: () => "设一本书 x 元",
+      hint: (v) => `(书的数量 × 单价) + 快递费 = 总金额`
     },
     {
-      // Type: ax + b = c
-      // Scenario: Group buying (Bubble tea + Plastic bag)
+      // Scenario: Plant Growth / Observation
+      // Logic: a + bx = c (Initial height + growth_rate * days = final height)
       gen: () => {
-        const x = randomInt(10, 30); // Price per cup
-        const a = randomInt(3, 8);   // Number of cups
-        const b = randomInt(1, 5);   // Bag fee
-        const c = a * x + b;        // Total
-        return { x, a, b, c };
+        const a = randomInt(5, 15);  // Initial height
+        const b = randomInt(2, 4);   // Growth per day
+        const x = randomInt(5, 14);  // Days
+        const c = a + b * x;         // Final
+        return { a, b, x, c };
       },
-      story: (v) => `办公室点了 ${v.a} 杯奶茶，还需要支付 ${v.b} 元的打包费，订单总额是 ${v.c} 元。`,
-      question: () => "一杯奶茶多少钱？",
-      unknown: () => "设一杯奶茶 x 元",
-      hint: (v) => `(杯数 × 单价) + 打包费 = 总额`
+      story: (v) => `科学课上，同学们在观察竹子的生长。刚种下时竹子高 ${v.a} 厘米，之后它每天长高 ${v.b} 厘米。经过若干天观察，竹子长到了 ${v.c} 厘米。`,
+      question: () => "同学们一共观察了多少天？",
+      unknown: () => "设观察了 x 天",
+      hint: (v) => `初始高度 + (每天长的 × 天数) = 最终高度`
     },
     {
-      // Type: ax - b = c
-      // Scenario: Discount/Coupon
+      // Scenario: Family Trip / Gas
+      // Logic: a - bx = c (Total fuel - consumption * hours = remaining)
       gen: () => {
-        const x = randomInt(30, 80); // Original price per item
-        const a = randomInt(2, 6);   // Quantity
-        const b = randomInt(10, 30);  // Coupon value
-        const c = a * x - b;         // Final price
-        return { x, a, b, c };
+        const a = randomInt(50, 70); // Tank capacity
+        const b = randomInt(6, 9);   // Consumption per hour
+        const x = randomInt(3, 5);   // Hours drove
+        const c = a - b * x;         // Remaining
+        return { a, b, x, c };
       },
-      story: (v) => `妈妈在网上买了 ${v.a} 箱牛奶，使用了一张 ${v.b} 元的优惠券后，实付 ${v.c} 元。`,
-      question: () => "每箱牛奶原价多少钱？",
-      unknown: () => "设每箱牛奶原价 x 元",
-      hint: (v) => `(数量 × 原价) - 优惠金额 = 实付金额`
+      story: (v) => `爸爸开车带全家去郊游。出发时油箱里有 ${v.a} 升汽油。汽车平均每小时消耗 ${v.b} 升油。到达目的地后，油箱里还剩 ${v.c} 升油。`,
+      question: () => "他们开了几个小时的车？",
+      unknown: () => "设开了 x 小时",
+      hint: (v) => `出发时的油量 - (每小时耗油 × 时间) = 剩下的油量`
     }
   ],
   [Difficulty.HARD]: [
     {
-      // Type: 2(x + b) = c  (Geometry)
-      // Scenario: Fencing a garden (Perimeter)
+      // Scenario: Savings Plan Comparison
+      // Logic: a + bx = c + dx (StartA + RateA * time = StartB + RateB * time)
       gen: () => {
-        const x = randomInt(8, 30);  // Length
-        const b = randomInt(4, 15);  // Width
-        const c = 2 * (x + b);       // Perimeter
-        return { x, b, c };
+        const x = randomInt(5, 12);  // Months
+        
+        const startA = randomInt(100, 300);
+        const rateA = randomInt(20, 40);
+        
+        const rateB = randomInt(10, 15); // Slower rate
+        // To make equal: startA + rateA*x = startB + rateB*x
+        // startB = startA + (rateA - rateB) * x
+        const startB = startA + (rateA - rateB) * x;
+        
+        return { x, startA, rateA, startB, rateB };
       },
-      story: (v) => `王大爷要给他的长方形菜园围篱笆。已知菜园的宽是 ${v.b} 米，围篱笆一共用了 ${v.c} 米（这就是周长）。`,
-      question: () => "菜园的长是多少米？",
-      unknown: () => "设长为 x 米",
-      hint: (v) => `长方形周长公式：(长 + 宽) × 2 = 周长`
+      story: (v) => `小明和小强在进行存钱比赛。小明原本有 ${v.startA} 元，以后每个月存 ${v.rateA} 元；小强原本有 ${v.startB} 元，但每个月只存 ${v.rateB} 元。存了几个月后，两人的存款总数竟然一样多了。`,
+      question: () => "他们存了多少个月？",
+      unknown: () => "设存了 x 个月",
+      hint: (v) => `小明的总钱数 = 小强的总钱数。分别列出两人的公式让它们相等。`
     },
     {
-      // Type: ax + b = cx + d (Savings Race)
-      // Scenario: Saving money comparison
+      // Scenario: Engineering / Tunnel
+      // Logic: (a + b) * x = c (Combined work rate)
       gen: () => {
-        const x = randomInt(4, 15); // Weeks
-        // Person A: starts low, saves high
-        const startA = randomInt(20, 80); 
-        const saveA = randomInt(20, 40); 
-        // Person B: starts high, saves low
-        const saveB = randomInt(5, 15);
-        // We need startB such that: startA + saveA * x = startB + saveB * x
-        // startB = startA + (saveA - saveB) * x
-        const startB = startA + (saveA - saveB) * x;
-        
-        return { x, startA, saveA, startB, saveB };
+        const a = randomInt(10, 20); // Team A speed
+        const b = randomInt(12, 25); // Team B speed
+        const x = randomInt(8, 15);  // Days
+        const c = (a + b) * x;       // Total length
+        return { a, b, x, c };
       },
-      story: (v) => `小明储蓄罐里有 ${v.startA} 元，他决定每周存 ${v.saveA} 元。小红储蓄罐里有 ${v.startB} 元，她每周存 ${v.saveB} 元。坚持存钱一段时间后，两人的钱数变得一样多了。`,
-      question: () => "他们存了多少周？",
-      unknown: () => "设存了 x 周",
-      hint: (v) => `小明的总钱数 = 小红的总钱数 (原有 + 每周存的 × 周数)`
+      story: (v) => `两个工程队从两端同时开凿一条长 ${v.c} 米的隧道。甲队每天开凿 ${v.a} 米，乙队每天开凿 ${v.b} 米。`,
+      question: () => "经过多少天隧道可以贯通？",
+      unknown: () => "设需要 x 天",
+      hint: (v) => `(甲队每天米数 + 乙队每天米数) × 天数 = 总长度`
     },
     {
-      // Type: ax + b = cx - d (Meeting/Travel)
-      // Scenario: Budget Spending
+      // Scenario: Mobile Phone Plan
+      // Logic: a + bx = cx (Base + rate*x = rate2*x)
       gen: () => {
-        const x = randomInt(3, 15); // Item price
-        const budgetA = randomInt(60, 120);
-        const countA = randomInt(2, 5); // A buys this many
+        const x = randomInt(20, 60); // Minutes
+        const a = randomInt(10, 30); // Base fee Plan A
+        const b = 0.2;               // Rate Plan A
+        const c = 0.5;               // Rate Plan B
+        // a + 0.2x = 0.5x -> a = 0.3x -> x = a / 0.3
+        // Let's simplify numbers to integers mostly
+        // a + 2x = 5x (scaled by 10) -> a = 3x.
+        // Let x be integer
+        const xInt = randomInt(5, 15);
+        const aInt = 3 * xInt; 
         
-        const budgetB = randomInt(150, 250);
-        const countB = countA + randomInt(2, 6); // B buys more
-        
-        // Equation: budgetA - countA * x = budgetB - countB * x (Remaining money is same)
-        // budgetB - budgetA = x * (countB - countA)
-        // x = (budgetB - budgetA) / (countB - countA)
-        
-        // Recalculate to ensure integer
-        const diffCount = countB - countA;
-        const diffBudget = x * diffCount;
-        const realBudgetB = budgetA + diffBudget;
-        
-        return { x, budgetA, countA, budgetB: realBudgetB, countB };
+        return { 
+          x: xInt, 
+          a: aInt, 
+          b: 2, // representing 0.2
+          c: 5  // representing 0.5
+        };
       },
-      story: (v) => `哥哥带了 ${v.budgetA} 元，弟弟带了 ${v.budgetB} 元。哥哥买了 ${v.countA} 个冰淇淋，弟弟买了 ${v.countB} 个同样的冰淇淋。买完后，他们剩下的钱竟然一样多。`,
-      question: () => "每个冰淇淋多少钱？",
-      unknown: () => "设每个冰淇淋 x 元",
-      hint: (v) => `哥哥剩下的钱 = 弟弟剩下的钱 (总钱数 - 买东西花的钱)`
+      story: (v) => `李叔叔在对比两种电话套餐。A套餐每月月租 ${v.a} 元，通话费每分钟 ${v.b} 角；B套餐没有月租，通话费每分钟 ${v.c} 角。李叔叔算了一下，如果通话时长是某个特定时间，两种套餐的费用正好一样。`,
+      question: () => "这个通话时长是多少分钟？",
+      unknown: () => "设通话时长为 x 分钟",
+      hint: (v) => `套餐A总费用 = 套餐B总费用。注意单位是“角”还是“元”。`
     }
   ]
 };
@@ -174,7 +175,6 @@ const templates: Record<Difficulty, Template[]> = {
 export const generateOfflineProblem = (difficulty: Difficulty, seenSignatures: Set<string> = new Set()): MathProblem => {
   const group = templates[difficulty];
   
-  // Try up to 50 times to generate a unique problem
   let attempts = 0;
   let bestProblem: any = null;
   let isUnique = false;
@@ -184,35 +184,43 @@ export const generateOfflineProblem = (difficulty: Difficulty, seenSignatures: S
     const tpl = group[tplIndex];
     const vars = tpl.gen();
     
-    // Create a unique signature based on content
     const signature = `${difficulty}-${tplIndex}-${JSON.stringify(vars)}`;
 
     if (!seenSignatures.has(signature)) {
-      // Found a unique one!
       isUnique = true;
       
-      // Construct Equation String
+      // Construct Equation string for checking
       let eq = "";
+      // Simple heuristic based on vars present
       if (vars.startA !== undefined) {
-         eq = `${vars.startA} + ${vars.saveA}x = ${vars.startB} + ${vars.saveB}x`;
-      } else if (vars.budgetA !== undefined) {
-         eq = `${vars.budgetA} - ${vars.countA}x = ${vars.budgetB} - ${vars.countB}x`;
-      } else if (vars.c !== undefined && vars.b !== undefined && vars.a === undefined) {
-         eq = `2(x + ${vars.b}) = ${vars.c}`;
-      } else if (vars.c !== undefined) {
-         if (vars.c === vars.a * vars.x - vars.b) {
-            eq = `${vars.a}x - ${vars.b} = ${vars.c}`;
-         } else {
-            eq = `${vars.a}x + ${vars.b} = ${vars.c}`;
+         eq = `${vars.startA} + ${vars.rateA}x = ${vars.startB} + ${vars.rateB}x`;
+      } else if (vars.c !== undefined && vars.b !== undefined && vars.a !== undefined && vars.x !== undefined) {
+         // Logic matching
+         // Engineering: (a+b)x=c
+         if (Math.abs((vars.a + vars.b) * vars.x - vars.c) < 0.1) {
+            eq = `(${vars.a} + ${vars.b})x = ${vars.c}`;
+         } 
+         // Mobile: a + bx = cx
+         else if (vars.a + vars.b * vars.x === vars.c * vars.x) {
+            eq = `${vars.a} + ${vars.b}x = ${vars.c}x`;
+         }
+         // Trip: a - bx = c
+         else if (Math.abs(vars.a - vars.b * vars.x - vars.c) < 0.1) {
+            eq = `${vars.a} - ${vars.b}x = ${vars.c}`;
+         }
+         // Plant: a + bx = c
+         else if (Math.abs(vars.a + vars.b * vars.x - vars.c) < 0.1) {
+             eq = `${vars.a} + ${vars.b}x = ${vars.c}`;
+         }
+         // Shopping: ax + b = c
+         else {
+             eq = `${vars.a}x + ${vars.b} = ${vars.c}`;
          }
       } else {
-         if (vars.b > vars.x) {
-            eq = `x + ${vars.a} = ${vars.b}`;
-         } else if (vars.a !== undefined && vars.b !== undefined && vars.x !== undefined && vars.b === vars.a * vars.x) {
-            eq = `${vars.a}x = ${vars.b}`;
-         } else {
-            eq = `x - ${vars.a} = ${vars.b}`;
-         }
+         // Easy templates
+         if (vars.a * vars.x === vars.b) eq = `${vars.a}x = ${vars.b}`;
+         else if (vars.a + vars.x === vars.b) eq = `${vars.a} + x = ${vars.b}`;
+         else if (vars.b - vars.x === vars.a) eq = `${vars.b} - x = ${vars.a}`;
       }
 
       bestProblem = {
@@ -229,33 +237,20 @@ export const generateOfflineProblem = (difficulty: Difficulty, seenSignatures: S
     attempts++;
   }
 
-  // If we exhausted attempts (very rare unless played for hours), just use the last generated one
-  // or regenerate one blindly if bestProblem is still null (shouldn't happen in loop unless bug).
+  // Fallback if loops fail
   if (!bestProblem) {
-     // Fallback: Generate one without checking
-     const tplIndex = randomInt(0, group.length - 1);
-     const tpl = group[tplIndex];
+     const tpl = group[0];
      const vars = tpl.gen();
-     // ... minimal reconstruction logic for fallback ...
-     // For brevity, let's assume the loop always finds one or we just take the collision.
-     // But to be safe in TS:
-     const signature = `${difficulty}-${tplIndex}-${JSON.stringify(vars)}`;
      bestProblem = {
         id: Date.now().toString(),
-        signature: signature,
+        signature: "fallback",
         story: tpl.story(vars),
         question: tpl.question(vars),
         unknownDefinition: tpl.unknown(vars),
-        equation: "x=0", // dummy fallback
+        equation: "x=0",
         answer: vars.x,
         hint: tpl.hint(vars)
      };
-     // Re-run eq logic for fallback (copy-paste for safety or refactor). 
-     // Since this is rare, we can accept a simplified fallback or just risk the duplicate.
-     // Let's just return the object derived in the loop, if loop failed, we regenerate vars once more.
-     if (!isUnique) {
-       // Just return it marked as duplicate signature
-     }
   }
 
   return bestProblem;

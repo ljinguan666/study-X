@@ -1,16 +1,16 @@
 export enum Difficulty {
-  EASY = 'EASY',     // x + a = b
-  MEDIUM = 'MEDIUM', // ax + b = c
-  HARD = 'HARD'      // ax + b = cx + d or parentheses
+  EASY = 'EASY',
+  MEDIUM = 'MEDIUM',
+  HARD = 'HARD'
 }
 
 export interface MathProblem {
   id: string;
-  signature: string; // Unique hash of the problem content (difficulty + template + vars)
+  signature: string; // Unique hash
   story: string;
   question: string;
-  unknownDefinition: string; // e.g., "Let x be the number of apples"
-  equation: string; // The canonical equation
+  unknownDefinition: string;
+  equation: string;
   answer: number;
   hint: string;
 }
