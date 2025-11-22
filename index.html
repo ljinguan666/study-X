@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Math Adventure: Equation Explorer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+      html, body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        overflow-x: hidden;
+        /* Dark background color as fallback */
+        background-color: #020617; 
+      }
+      
+      body {
+        font-family: 'Fredoka', sans-serif;
+        /* Transparent to let canvas show through */
+        background: transparent; 
+        color: white;
+      }
+      
+      /* Background Canvas */
+      #bg-canvas {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: -1;
+        background: radial-gradient(circle at center, #1e293b 0%, #020617 100%);
+      }
+
+      /* Confetti Canvas */
+      #confetti-canvas {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 9999;
+      }
+
+      /* React Root */
+      #root {
+        position: relative;
+        z-index: 1; 
+        min-height: 100vh;
+      }
+
+      /* Glassmorphism Panels */
+      .glass-panel {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.6);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      }
+
+      .chalkboard {
+        background-color: #2d3748;
+        color: #f7fafc;
+        font-family: 'Courier New', Courier, monospace;
+        box-shadow: inset 0 0 20px rgba(0,0,0,0.5), 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+        border: 4px solid #4a5568;
+      }
+      
+      /* Animations */
+      @keyframes slideUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .animate-slide-up { animation: slideUp 0.5s ease-out forwards; }
+
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      .animate-fade-in { animation: fadeIn 0.8s ease-out; }
+
+      @keyframes bounce-slight {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-5px); }
+      }
+      .animate-bounce-slight { animation: bounce-slight 2s infinite; }
+
+      @keyframes pulse-glow {
+        0%, 100% { box-shadow: 0 0 15px rgba(59, 130, 246, 0.5); }
+        50% { box-shadow: 0 0 25px rgba(59, 130, 246, 0.8); }
+      }
+      .animate-pulse-glow { animation: pulse-glow 3s infinite; }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.1",
+    "vite": "https://aistudiocdn.com/vite@^7.2.4"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <canvas id="bg-canvas"></canvas>
+    <div id="root"></div>
+    <canvas id="confetti-canvas"></canvas>
+    
+    <!-- Entry point for Vite -->
+    <script type="module" src="/index.tsx"></script>
+
+    <script>
+      /**
+       * PARTICLE SYSTEM
+       */
+      (function() {
+        const canvas = document.getElementById('bg-canvas');
+        const ctx = canvas.getContext('2d');
+        let width, height;
+        let particles = [];
+        
+        const symbols = ['+', '-', '×', '÷', '=', 'π', 'x', 'y', '√', '∞', '?'];
+        const colors = ['#60A5FA', '#A78BFA', '#34D399', '#F472B6', '#FBBF24'];
+
+        // Mouse state
+        let mouse = { x: null, y: null, radius: 150 };
+
+        window.addEventListener('mousemove', (e) => {
+          mouse.x = e.x;
+          mouse.y = e.y;
+        });
+
+        window.addEventListener('resize', resize);
+
+        function resize() {
+          width = window.innerWidth;
+          height = window.innerHeight;
+          canvas.width = width;
+          canvas.height = height;
+          initParticles();
+        }
+
+        class Particle {
+          constructor() {
+            this.init();
+          }
+
+          init() {
+            this.x = Math.random() * width;
+            this.y = Math.random() * height;
+            this.dx = (Math.random() - 0.5) * 0.5; // Slower movement
+            this.dy = (Math.random() - 0.5) * 0.5;
+            this.size = Math.random() * 3 + 1;
+            // 15% chance to be a symbol
+            this.symbol = Math.random() > 0.85 ? symbols[Math.floor(Math.random() * symbols.length)] : null;
+            this.color = colors[Math.floor(Math.random() * colors.length)];
+            this.opacity = Math.random() * 0.5 + 0.1;
+          }
+
+          draw() {
+            ctx.globalAlpha = this.opacity;
+            ctx.fillStyle = this.color;
+            
+            if (this.symbol) {
+              ctx.font = 'bold 16px Fredoka';
+              ctx.fillText(this.symbol, this.x, this.y);
+            } else {
+              ctx.beginPath();
+              ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+              ctx.fill();
+            }
+            ctx.globalAlpha = 1;
+          }
+
+          update() {
+            this.x += this.dx;
+            this.y += this.dy;
+
+            // Wrap around screen
+            if (this.x < 0) this.x = width;
+            if (this.x > width) this.x = 0;
+            if (this.y < 0) this.y = height;
+            if (this.y > height) this.y = 0;
+
+            // Mouse interaction
+            if (mouse.x != null) {
+              let dx = mouse.x - this.x;
+              let dy = mouse.y - this.y;
+              let distance = Math.sqrt(dx*dx + dy*dy);
+              if (distance < mouse.radius) {
+                 const forceDirectionX = dx / distance;
+                 const forceDirectionY = dy / distance;
+                 const force = (mouse.radius - distance) / mouse.radius;
+                 const directionX = forceDirectionX * force * 3;
+                 const directionY = forceDirectionY * force * 3;
+                 this.x -= directionX;
+                 this.y -= directionY;
+              }
+            }
+
+            this.draw();
+          }
+        }
+
+        function initParticles() {
+          particles = [];
+          const numberOfParticles = (width * height) / 9000; // Density
+          for (let i = 0; i < numberOfParticles; i++) {
+            particles.push(new Particle());
+          }
+        }
+
+        function animate() {
+          requestAnimationFrame(animate);
+          ctx.clearRect(0, 0, width, height);
+          
+          // Draw particles
+          particles.forEach(p => p.update());
+          
+          // Draw connections
+          connect();
+        }
+
+        function connect() {
+          let opacityValue = 1;
+          for (let a = 0; a < particles.length; a++) {
+            for (let b = a; b < particles.length; b++) {
+              let dx = particles[a].x - particles[b].x;
+              let dy = particles[a].y - particles[b].y;
+              let distance = dx * dx + dy * dy;
+
+              if (distance < (width/7) * (height/7)) {
+                opacityValue = 1 - (distance / 20000);
+                if (opacityValue > 0) {
+                  ctx.strokeStyle = particles[a].color;
+                  ctx.globalAlpha = opacityValue * 0.2;
+                  ctx.lineWidth = 1;
+                  ctx.beginPath();
+                  ctx.moveTo(particles[a].x, particles[a].y);
+                  ctx.lineTo(particles[b].x, particles[b].y);
+                  ctx.stroke();
+                }
+              }
+            }
+          }
+        }
+
+        // Start
+        resize();
+        animate();
+      })();
+
+      /**
+       * CONFETTI SYSTEM
+       */
+      (function() {
+        const canvas = document.getElementById('confetti-canvas');
+        const ctx = canvas.getContext('2d');
+        let width, height;
+        let confetti = [];
+
+        window.addEventListener('resize', () => {
+          width = window.innerWidth;
+          height = window.innerHeight;
+          canvas.width = width;
+          canvas.height = height;
+        });
+        
+        // Initial resize
+        width = window.innerWidth;
+        height = window.innerHeight;
+        canvas.width = width;
+        canvas.height = height;
+
+        const colors = ['#f00', '#0f0', '#00f', '#ff0', '#0ff', '#f0f'];
+
+        class ConfettiPiece {
+          constructor() {
+            this.x = Math.random() * width;
+            this.y = -10;
+            this.size = Math.random() * 10 + 5;
+            this.color = colors[Math.floor(Math.random() * colors.length)];
+            this.speed = Math.random() * 3 + 2;
+            this.angle = Math.random() * 360;
+            this.spin = Math.random() * 5 - 2.5;
+          }
+          
+          update() {
+            this.y += this.speed;
+            this.angle += this.spin;
+            this.x += Math.sin(this.angle * Math.PI / 180) * 2;
+            
+            if (this.y > height) {
+              this.y = -10; // loop for continuous effect if needed, or remove
+            }
+          }
+
+          draw() {
+            ctx.save();
+            ctx.translate(this.x, this.y);
+            ctx.rotate(this.angle * Math.PI / 180);
+            ctx.fillStyle = this.color;
+            ctx.fillRect(-this.size/2, -this.size/2, this.size, this.size);
+            ctx.restore();
+          }
+        }
+
+        let animationId;
+
+        function loop() {
+          ctx.clearRect(0, 0, width, height);
+          confetti.forEach(p => {
+            p.update();
+            p.draw();
+          });
+          // Remove off-screen confetti slowly to stop animation eventually
+          if (confetti.length > 0) {
+            animationId = requestAnimationFrame(loop);
+          }
+        }
+
+        // Global function to trigger confetti
+        window.triggerConfetti = function() {
+          confetti = [];
+          for (let i = 0; i < 150; i++) {
+            confetti.push(new ConfettiPiece());
+          }
+          // burst mode: make them start at random heights initially to fill screen or top
+          confetti.forEach(p => p.y = Math.random() * height * -1); 
+          
+          if (animationId) cancelAnimationFrame(animationId);
+          loop();
+          
+          // Stop after 5 seconds
+          setTimeout(() => {
+            confetti = []; // clear
+            ctx.clearRect(0, 0, width, height);
+            if (animationId) cancelAnimationFrame(animationId);
+          }, 5000);
+        };
+      })();
+    </script>
+  </body>
+</html>
