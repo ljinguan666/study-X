@@ -4,10 +4,9 @@ export enum Difficulty {
   HARD = 'HARD'      // ax + b = cx + d or parentheses
 }
 
-export type Language = 'zh' | 'en';
-
 export interface MathProblem {
   id: string;
+  signature: string; // Unique hash of the problem content (difficulty + template + vars)
   story: string;
   question: string;
   unknownDefinition: string; // e.g., "Let x be the number of apples"
@@ -29,4 +28,10 @@ export enum GameStep {
 export interface CheckResult {
   correct: boolean;
   feedback: string;
+}
+
+export interface ChatMessage {
+  role: 'user' | 'model';
+  text: string;
+  timestamp: number;
 }

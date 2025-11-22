@@ -1,5 +1,5 @@
-import { CheckResult, Language } from "../types";
-import { translations } from "../locales";
+import { CheckResult } from "../types";
+import { STRINGS } from "../locales";
 
 /**
  * Evaluates a math expression string with a given variable value.
@@ -30,14 +30,13 @@ const evaluateExpression = (expr: string, xVal: number): number => {
 
 export const checkEquationOffline = (
   targetAnswer: number, 
-  userEq: string, 
-  lang: Language
+  userEq: string
 ): CheckResult => {
   const parts = userEq.split('=');
   if (parts.length !== 2) {
     return { 
       correct: false, 
-      feedback: lang === 'zh' ? "方程必须包含一个等号 '='" : "An equation must have one '=' sign." 
+      feedback: "方程必须包含一个等号 '='" 
     };
   }
 
@@ -52,7 +51,7 @@ export const checkEquationOffline = (
   if (isNaN(valL) || isNaN(valR)) {
      return { 
       correct: false, 
-      feedback: lang === 'zh' ? "方程包含无法识别的字符。" : "Equation contains invalid characters." 
+      feedback: "方程包含无法识别的字符。" 
     };
   }
 
@@ -60,12 +59,12 @@ export const checkEquationOffline = (
   if (Math.abs(valL - valR) < 0.001) {
     return { 
       correct: true, 
-      feedback: translations[lang].feedback.correctEq 
+      feedback: STRINGS.feedback.correctEq 
     };
   }
 
   return { 
     correct: false, 
-    feedback: translations[lang].feedback.errorEq 
+    feedback: STRINGS.feedback.errorEq 
   };
 };

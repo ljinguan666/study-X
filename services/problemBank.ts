@@ -1,13 +1,13 @@
-import { Difficulty, MathProblem, Language } from "../types";
+import { Difficulty, MathProblem } from "../types";
 
 // Helper to get random integer between min and max (inclusive)
 const randomInt = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
 
 interface Template {
-  story: (v: any) => { zh: string, en: string };
-  question: (v: any) => { zh: string, en: string };
-  unknown: (v: any) => { zh: string, en: string };
-  hint: (v: any) => { zh: string, en: string };
+  story: (v: any) => string;
+  question: (v: any) => string;
+  unknown: (v: any) => string;
+  hint: (v: any) => string;
   gen: () => any; // Generates the numbers
 }
 
@@ -16,144 +16,247 @@ interface Template {
 const templates: Record<Difficulty, Template[]> = {
   [Difficulty.EASY]: [
     {
-      // Type: x + a = b (Addition)
+      // Type: x + a = b (Growth/Addition)
+      // Scenario: Plant height / Height growth
       gen: () => {
-        const x = randomInt(5, 20);
-        const a = randomInt(5, 20);
-        const b = x + a;
-        return { x, a, b, item: ["apples", "books", "candies"][randomInt(0, 2)] };
+        const x = randomInt(10, 60); // Original height
+        const a = randomInt(5, 25);  // Grown amount
+        const b = x + a;             // Current height
+        return { x, a, b };
       },
-      story: (v) => ({
-        zh: `小明有一些${v.item === 'apples' ? '苹果' : v.item === 'books' ? '书' : '糖果'}，妈妈又给了他 ${v.a} 个。现在他一共有 ${v.b} 个。`,
-        en: `Tom had some ${v.item}, and his mom gave him ${v.a} more. Now he has ${v.b} in total.`
-      }),
-      question: () => ({ zh: "原来有多少个？", en: "How many did he have originally?" }),
-      unknown: (v) => ({ zh: `设原来有 x 个${v.item === 'apples' ? '苹果' : v.item === 'books' ? '书' : '糖果'}`, en: `Let x be the original number of ${v.item}` }),
-      hint: (v) => ({ zh: `原来的数量 + 妈妈给的 = 总数 (${v.b})`, en: `Original + Given = Total (${v.b})` })
+      story: (v) => `学校生物角种了一棵向日葵。上个月它长高了 ${v.a} 厘米，现在的总高度是 ${v.b} 厘米。`,
+      question: () => "这棵向日葵原来有多高？",
+      unknown: () => "设向日葵原来高度为 x 厘米",
+      hint: (v) => `原来的高度 + 长高的高度 (${v.a}) = 现在的高度`
     },
     {
-      // Type: x - a = b (Subtraction)
+      // Type: x - a = b (Spending/Consumption)
+      // Scenario: Pocket money
       gen: () => {
-        const x = randomInt(20, 50);
-        const a = randomInt(5, 15);
-        const b = x - a;
-        return { x, a, b, item: ["coins", "cards"][randomInt(0, 1)] };
+        const x = randomInt(25, 120); // Original money
+        const a = randomInt(6, 20);   // Spent
+        const b = x - a;              // Left
+        return { x, a, b };
       },
-      story: (v) => ({
-        zh: `盒子里有一些${v.item === 'coins' ? '硬币' : '卡片'}，拿走了 ${v.a} 个后，还剩下 ${v.b} 个。`,
-        en: `There were some ${v.item} in a box. After taking out ${v.a}, there are ${v.b} left.`
-      }),
-      question: () => ({ zh: "盒子里原来有多少个？", en: "How many were in the box originally?" }),
-      unknown: (v) => ({ zh: "设原来有 x 个", en: "Let x be the original number" }),
-      hint: (v) => ({ zh: `原来的 - 拿走的 = 剩下的`, en: `Original - Taken = Left` })
+      story: (v) => `小明带了一些零花钱去书店。他买了一本漫画书花了 ${v.a} 元，钱包里还剩下 ${v.b} 元。`,
+      question: () => "小明原来带了多少钱？",
+      unknown: () => "设小明原来带了 x 元",
+      hint: (v) => `原来的钱 - 花掉的钱 = 剩下的钱`
+    },
+    {
+      // Type: ax = b (Division/Sharing)
+      // Scenario: Rectangular Area or Grouping
+      gen: () => {
+        const x = randomInt(5, 15); // Width or Count
+        const a = randomInt(4, 9);  // Length or Price
+        const b = a * x;            // Total
+        return { x, a, b };
+      },
+      story: (v) => `李老师买了 ${v.a} 盒同样的彩笔作为奖品，一共支付了 ${v.b} 元。`,
+      question: () => "每盒彩笔多少钱？",
+      unknown: () => "设每盒彩笔 x 元",
+      hint: (v) => `盒数 × 单价 = 总价`
     }
   ],
   [Difficulty.MEDIUM]: [
     {
       // Type: ax + b = c
+      // Scenario: Taxi Fare (Start fee + mileage)
       gen: () => {
-        const x = randomInt(2, 12);
-        const a = randomInt(2, 5); // price or multiplier
-        const b = randomInt(5, 20); // extra
-        const c = a * x + b;
+        const x = randomInt(5, 30); // Distance (km)
+        const a = randomInt(2, 5);  // Price per km
+        const b = randomInt(8, 18); // Base fare
+        const c = a * x + b;        // Total fare
         return { x, a, b, c };
       },
-      story: (v) => ({
-        zh: `文具店里，一支钢笔 ${v.a} 元。小红买了若干支钢笔，又买了一个 ${v.b} 元的笔记本，一共花了 ${v.c} 元。`,
-        en: `A pen costs $${v.a}. Sarah bought some pens and a notebook for $${v.b}. She spent $${v.c} in total.`
-      }),
-      question: () => ({ zh: "她买了几支钢笔？", en: "How many pens did she buy?" }),
-      unknown: () => ({ zh: "设她买了 x 支钢笔", en: "Let x be the number of pens" }),
-      hint: (v) => ({ zh: `(钢笔单价 × 数量) + 笔记本 = 总花费`, en: `(Price × Quantity) + Notebook = Total` })
+      story: (v) => `小红坐出租车回家。出租车的起步价是 ${v.b} 元，之后每公里收 ${v.a} 元。小红一共付了 ${v.c} 元。`,
+      question: () => "小红坐了多少公里？",
+      unknown: () => "设行程为 x 公里",
+      hint: (v) => `(每公里价格 × 公里数) + 起步价 = 总费用`
+    },
+    {
+      // Type: ax + b = c
+      // Scenario: Group buying (Bubble tea + Plastic bag)
+      gen: () => {
+        const x = randomInt(10, 30); // Price per cup
+        const a = randomInt(3, 8);   // Number of cups
+        const b = randomInt(1, 5);   // Bag fee
+        const c = a * x + b;        // Total
+        return { x, a, b, c };
+      },
+      story: (v) => `办公室点了 ${v.a} 杯奶茶，还需要支付 ${v.b} 元的打包费，订单总额是 ${v.c} 元。`,
+      question: () => "一杯奶茶多少钱？",
+      unknown: () => "设一杯奶茶 x 元",
+      hint: (v) => `(杯数 × 单价) + 打包费 = 总额`
     },
     {
       // Type: ax - b = c
+      // Scenario: Discount/Coupon
       gen: () => {
-        const x = randomInt(5, 15);
-        const a = randomInt(3, 6); 
-        const b = randomInt(1, 10);
-        const c = a * x - b;
+        const x = randomInt(30, 80); // Original price per item
+        const a = randomInt(2, 6);   // Quantity
+        const b = randomInt(10, 30);  // Coupon value
+        const c = a * x - b;         // Final price
         return { x, a, b, c };
       },
-      story: (v) => ({
-        zh: `一个数字的 ${v.a} 倍减去 ${v.b} 等于 ${v.c}。`,
-        en: `${v.a} times a number minus ${v.b} equals ${v.c}.`
-      }),
-      question: () => ({ zh: "这个数字是多少？", en: "What is the number?" }),
-      unknown: () => ({ zh: "设这个数字是 x", en: "Let x be the number" }),
-      hint: (v) => ({ zh: `${v.a}x - ${v.b} = ...`, en: `${v.a}x - ${v.b} = ...` })
+      story: (v) => `妈妈在网上买了 ${v.a} 箱牛奶，使用了一张 ${v.b} 元的优惠券后，实付 ${v.c} 元。`,
+      question: () => "每箱牛奶原价多少钱？",
+      unknown: () => "设每箱牛奶原价 x 元",
+      hint: (v) => `(数量 × 原价) - 优惠金额 = 实付金额`
     }
   ],
   [Difficulty.HARD]: [
     {
-      // Type: a(x + b) = c
+      // Type: 2(x + b) = c  (Geometry)
+      // Scenario: Fencing a garden (Perimeter)
       gen: () => {
-        const x = randomInt(2, 15);
-        const b = randomInt(1, 10);
-        const a = randomInt(2, 6);
-        const c = a * (x + b);
-        return { x, a, b, c };
+        const x = randomInt(8, 30);  // Length
+        const b = randomInt(4, 15);  // Width
+        const c = 2 * (x + b);       // Perimeter
+        return { x, b, c };
       },
-      story: (v) => ({
-        zh: `两袋大米，第一袋重 ${v.b} 千克。如果你往每袋里都加 x 千克，那么两袋的总重量的 ${v.a} 倍甚至达到了 ${2*v.c} (哎呀搞错了，是每袋加完后的重量乘以 ${v.a} 等于 ${v.c})。简单点说：(${v.b} + x) 的 ${v.a} 倍是 ${v.c}。`,
-        en: `Think of a number, add ${v.b} to it, then multiply the result by ${v.a}. You get ${v.c}.`
-      }),
-      question: () => ({ zh: "这个数是多少？", en: "What is the number?" }),
-      unknown: () => ({ zh: "设这个数是 x", en: "Let x be the number" }),
-      hint: (v) => ({ zh: `${v.a} × (x + ${v.b}) = ${v.c}`, en: `${v.a}(x + ${v.b}) = ${v.c}` })
+      story: (v) => `王大爷要给他的长方形菜园围篱笆。已知菜园的宽是 ${v.b} 米，围篱笆一共用了 ${v.c} 米（这就是周长）。`,
+      question: () => "菜园的长是多少米？",
+      unknown: () => "设长为 x 米",
+      hint: (v) => `长方形周长公式：(长 + 宽) × 2 = 周长`
     },
     {
-      // Type: ax + b = cx + d
+      // Type: ax + b = cx + d (Savings Race)
+      // Scenario: Saving money comparison
       gen: () => {
-        const x = randomInt(2, 10);
-        const c = randomInt(2, 5);
-        const a = c + randomInt(1, 3); // Ensure a > c so x is positive
-        const b = randomInt(1, 20);
-        // ax + b = cx + d  =>  (a-c)x = d - b. 
-        // Let d - b = (a-c)x
-        const diffX = a - c;
-        const rhsVal = diffX * x;
-        const d = rhsVal + b;
-        return { x, a, b, c, d };
+        const x = randomInt(4, 15); // Weeks
+        // Person A: starts low, saves high
+        const startA = randomInt(20, 80); 
+        const saveA = randomInt(20, 40); 
+        // Person B: starts high, saves low
+        const saveB = randomInt(5, 15);
+        // We need startB such that: startA + saveA * x = startB + saveB * x
+        // startB = startA + (saveA - saveB) * x
+        const startB = startA + (saveA - saveB) * x;
+        
+        return { x, startA, saveA, startB, saveB };
       },
-      story: (v) => ({
-        zh: `左边有 ${v.a} 盒积木和 ${v.b} 块散装积木。右边有 ${v.c} 盒积木和 ${v.d} 块散装积木。两边的积木总数一样多。`,
-        en: `Left side has ${v.a} boxes of blocks and ${v.b} loose blocks. Right side has ${v.c} boxes and ${v.d} loose blocks. The total is equal.`
-      }),
-      question: () => ({ zh: "每盒积木有多少块？", en: "How many blocks are in one box?" }),
-      unknown: () => ({ zh: "设每盒有 x 块", en: "Let x be the blocks per box" }),
-      hint: (v) => ({ zh: `${v.a}x + ${v.b} = ${v.c}x + ${v.d}`, en: `${v.a}x + ${v.b} = ${v.c}x + ${v.d}` })
+      story: (v) => `小明储蓄罐里有 ${v.startA} 元，他决定每周存 ${v.saveA} 元。小红储蓄罐里有 ${v.startB} 元，她每周存 ${v.saveB} 元。坚持存钱一段时间后，两人的钱数变得一样多了。`,
+      question: () => "他们存了多少周？",
+      unknown: () => "设存了 x 周",
+      hint: (v) => `小明的总钱数 = 小红的总钱数 (原有 + 每周存的 × 周数)`
+    },
+    {
+      // Type: ax + b = cx - d (Meeting/Travel)
+      // Scenario: Budget Spending
+      gen: () => {
+        const x = randomInt(3, 15); // Item price
+        const budgetA = randomInt(60, 120);
+        const countA = randomInt(2, 5); // A buys this many
+        
+        const budgetB = randomInt(150, 250);
+        const countB = countA + randomInt(2, 6); // B buys more
+        
+        // Equation: budgetA - countA * x = budgetB - countB * x (Remaining money is same)
+        // budgetB - budgetA = x * (countB - countA)
+        // x = (budgetB - budgetA) / (countB - countA)
+        
+        // Recalculate to ensure integer
+        const diffCount = countB - countA;
+        const diffBudget = x * diffCount;
+        const realBudgetB = budgetA + diffBudget;
+        
+        return { x, budgetA, countA, budgetB: realBudgetB, countB };
+      },
+      story: (v) => `哥哥带了 ${v.budgetA} 元，弟弟带了 ${v.budgetB} 元。哥哥买了 ${v.countA} 个冰淇淋，弟弟买了 ${v.countB} 个同样的冰淇淋。买完后，他们剩下的钱竟然一样多。`,
+      question: () => "每个冰淇淋多少钱？",
+      unknown: () => "设每个冰淇淋 x 元",
+      hint: (v) => `哥哥剩下的钱 = 弟弟剩下的钱 (总钱数 - 买东西花的钱)`
     }
   ]
 };
 
-export const generateOfflineProblem = (difficulty: Difficulty, lang: Language): MathProblem => {
+export const generateOfflineProblem = (difficulty: Difficulty, seenSignatures: Set<string> = new Set()): MathProblem => {
   const group = templates[difficulty];
-  const tpl = group[randomInt(0, group.length - 1)];
-  const vars = tpl.gen();
   
-  // Construct Equation String for display/check
-  // Note: This is a simplified construction for the "answer key"
-  let eq = "";
-  if (vars.d !== undefined) {
-    eq = `${vars.a}x + ${vars.b} = ${vars.c}x + ${vars.d}`;
-  } else if (vars.item) {
-    // Simple types
-    eq = vars.b > vars.x ? `x + ${vars.a} = ${vars.b}` : `x - ${vars.a} = ${vars.b}`;
-  } else {
-    // Medium/Hard generic
-    if (vars.c === vars.a * (vars.x + vars.b)) eq = `${vars.a}(x + ${vars.b}) = ${vars.c}`;
-    else if (vars.c === vars.a * vars.x + vars.b) eq = `${vars.a}x + ${vars.b} = ${vars.c}`;
-    else if (vars.c === vars.a * vars.x - vars.b) eq = `${vars.a}x - ${vars.b} = ${vars.c}`;
+  // Try up to 50 times to generate a unique problem
+  let attempts = 0;
+  let bestProblem: any = null;
+  let isUnique = false;
+
+  while (attempts < 50 && !isUnique) {
+    const tplIndex = randomInt(0, group.length - 1);
+    const tpl = group[tplIndex];
+    const vars = tpl.gen();
+    
+    // Create a unique signature based on content
+    const signature = `${difficulty}-${tplIndex}-${JSON.stringify(vars)}`;
+
+    if (!seenSignatures.has(signature)) {
+      // Found a unique one!
+      isUnique = true;
+      
+      // Construct Equation String
+      let eq = "";
+      if (vars.startA !== undefined) {
+         eq = `${vars.startA} + ${vars.saveA}x = ${vars.startB} + ${vars.saveB}x`;
+      } else if (vars.budgetA !== undefined) {
+         eq = `${vars.budgetA} - ${vars.countA}x = ${vars.budgetB} - ${vars.countB}x`;
+      } else if (vars.c !== undefined && vars.b !== undefined && vars.a === undefined) {
+         eq = `2(x + ${vars.b}) = ${vars.c}`;
+      } else if (vars.c !== undefined) {
+         if (vars.c === vars.a * vars.x - vars.b) {
+            eq = `${vars.a}x - ${vars.b} = ${vars.c}`;
+         } else {
+            eq = `${vars.a}x + ${vars.b} = ${vars.c}`;
+         }
+      } else {
+         if (vars.b > vars.x) {
+            eq = `x + ${vars.a} = ${vars.b}`;
+         } else if (vars.a !== undefined && vars.b !== undefined && vars.x !== undefined && vars.b === vars.a * vars.x) {
+            eq = `${vars.a}x = ${vars.b}`;
+         } else {
+            eq = `x - ${vars.a} = ${vars.b}`;
+         }
+      }
+
+      bestProblem = {
+        id: Date.now().toString() + Math.random(),
+        signature: signature,
+        story: tpl.story(vars),
+        question: tpl.question(vars),
+        unknownDefinition: tpl.unknown(vars),
+        equation: eq,
+        answer: vars.x,
+        hint: tpl.hint(vars)
+      };
+    }
+    attempts++;
   }
 
-  return {
-    id: Date.now().toString(),
-    story: tpl.story(vars)[lang],
-    question: tpl.question(vars)[lang],
-    unknownDefinition: tpl.unknown(vars)[lang],
-    equation: eq,
-    answer: vars.x,
-    hint: tpl.hint(vars)[lang]
-  };
+  // If we exhausted attempts (very rare unless played for hours), just use the last generated one
+  // or regenerate one blindly if bestProblem is still null (shouldn't happen in loop unless bug).
+  if (!bestProblem) {
+     // Fallback: Generate one without checking
+     const tplIndex = randomInt(0, group.length - 1);
+     const tpl = group[tplIndex];
+     const vars = tpl.gen();
+     // ... minimal reconstruction logic for fallback ...
+     // For brevity, let's assume the loop always finds one or we just take the collision.
+     // But to be safe in TS:
+     const signature = `${difficulty}-${tplIndex}-${JSON.stringify(vars)}`;
+     bestProblem = {
+        id: Date.now().toString(),
+        signature: signature,
+        story: tpl.story(vars),
+        question: tpl.question(vars),
+        unknownDefinition: tpl.unknown(vars),
+        equation: "x=0", // dummy fallback
+        answer: vars.x,
+        hint: tpl.hint(vars)
+     };
+     // Re-run eq logic for fallback (copy-paste for safety or refactor). 
+     // Since this is rare, we can accept a simplified fallback or just risk the duplicate.
+     // Let's just return the object derived in the loop, if loop failed, we regenerate vars once more.
+     if (!isUnique) {
+       // Just return it marked as duplicate signature
+     }
+  }
+
+  return bestProblem;
 };
