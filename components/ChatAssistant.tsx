@@ -135,11 +135,7 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({ problem, isOpen, o
           audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
         }
         const ctx = audioContextRef.current;
-        if (!ctx) {
-          console.error("AudioContext not available");
-          return;
-        }
-        
+        if (!ctx) return; // Safety check
         const buffer = await decodeAudioData(base64Audio, ctx);
         
         const source = ctx.createBufferSource();

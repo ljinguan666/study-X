@@ -169,6 +169,7 @@ const genMedium_Linear = () => {
   
   let story = "";
   if (ctx.type === "taxi") {
+    story = `${pick(NAMES)}坐出租车回家，起步价是 ${base} 元，之后每行驶1公里收费 ${rate} 元。到达目的地时，一共付了 ${total} 元。`,
     story = `${pick(NAMES)}坐出租车回家，起步价是 ${base} 元，之后每行驶1公里收费 ${rate} 元。到达目的地时，一共付了 ${total} 元。`;
   } else if (ctx.type === "plant") {
     story = `同学们种了一棵高 ${base} 厘米的${ctx.name}，它生长非常快，平均每天长高 ${rate} 厘米。经过一段时间后，它长到了 ${total} 厘米。`;
@@ -282,8 +283,8 @@ const genHard_EquationBalance = () => {
   
   const p1 = pick(NAMES);
   const p2 = pick(NAMES);
-        
-        return { 
+
+  return {
     story: `${p1}有存款 ${c} 元，以后每月存 ${d} 元。${p2}有存款 ${a} 元，以后每月存 ${b} 元。`,
     question: `几个月后，两人的存款总额一样多？`,
     unknown: `设 x 个月后`,
@@ -324,7 +325,7 @@ export const generateOfflineProblem = (difficulty: Difficulty, seenSignatures: S
     // Create a signature based on the core numbers and question type
     // e.g. "MEDIUM-Shopping-3x+10=100"
     const signature = `${difficulty}-${raw.equation}-${raw.answer}`;
-
+    
     if (!seenSignatures.has(signature)) {
       bestProblem = {
         id: Date.now().toString() + Math.random(),
@@ -344,7 +345,7 @@ export const generateOfflineProblem = (difficulty: Difficulty, seenSignatures: S
   // Fallback if we somehow fail to generate unique (unlikely with this combinatorics)
   if (!bestProblem) {
     const fallbackRaw = genEasy_Total();
-     bestProblem = {
+    bestProblem = {
         id: Date.now().toString(),
         signature: "fallback-" + Date.now(),
         story: fallbackRaw.story,
@@ -353,7 +354,7 @@ export const generateOfflineProblem = (difficulty: Difficulty, seenSignatures: S
         equation: fallbackRaw.equation,
         answer: fallbackRaw.answer,
         hint: fallbackRaw.hint
-     };
+    };
   }
 
   return bestProblem;
