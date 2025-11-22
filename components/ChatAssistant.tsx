@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChatMessage, MathProblem } from '../types';
-import { getAIExplanation, getGeminiTTS } from '../services/geminiService';
+import { getAIExplanation } from '../services/geminiService';
 import { STRINGS } from '../locales';
 
 interface ChatAssistantProps {
@@ -9,46 +9,29 @@ interface ChatAssistantProps {
   onClose: () => void;
 }
 
+// Type definition for Web Speech API
+declare global {
+  interface Window {
+    webkitSpeechRecognition: any;
+    SpeechRecognition: any;
+  }
+}
+
 export const ChatAssistant: React.FC<ChatAssistantProps> = ({ problem, isOpen, onClose }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [isListening, setIsListening] = useState(false);
-  const [isSoundOn, setIsSoundOn] = useState(true);
+  const [isSoundOn, setIsSoundOn] = useState(false); 
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isListening, setIsListening] = useState(false); // STT state
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
-
-  // Initialize AudioContext on user interaction
-  const initAudio = () => {
-    if (!audioContextRef.current) {
-      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-    }
-    if (audioContextRef.current.state === 'suspended') {
-      audioContextRef.current.resume();
-    }
-  };
-
-  // Initialize voices
-  useEffect(() => {
-    const loadVoices = () => {
-      window.speechSynthesis.getVoices();
-    };
-    loadVoices();
-    window.speechSynthesis.onvoiceschanged = loadVoices;
-    
-    return () => {
-      window.speechSynthesis.cancel();
-      if (audioContextRef.current) {
-        audioContextRef.current.close();
-      }
-    };
-  }, []);
+  const recognitionRef = useRef<any>(null);
 
   // Initialize with greeting
   useEffect(() => {
     if (isOpen && messages.length === 0) {
-      const introText = STRINGS.chat.intro;
+      const introText = "你好！我是DeepSeek驱动的智能助教。这道题哪里不懂，可以直接跟我说哦！";
       setMessages([
         {
           role: 'model',
@@ -56,9 +39,6 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({ problem, isOpen, o
           timestamp: Date.now()
         }
       ]);
-      if (isSoundOn) {
-        setTimeout(() => speak(introText), 500);
-      }
     }
   }, [isOpen, problem]);
 
@@ -73,56 +53,80 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({ problem, isOpen, o
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isOpen, isListening]);
 
-  const speak = async (text: string) => {
-    if (!isSoundOn) return;
-    initAudio();
-    setIsSpeaking(true);
+  // Initialize Speech Recognition
+  useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'zh-CN';
+      recognition.continuous = false;
+      recognition.interimResults = true;
 
-    // 1. Try Gemini TTS (High Quality)
-    try {
-      const audioBufferData = await getGeminiTTS(text);
+      recognition.onstart = () => setIsListening(true);
+      recognition.onend = () => setIsListening(false);
       
-      if (audioBufferData && audioContextRef.current) {
-         const audioBuffer = await audioContextRef.current.decodeAudioData(audioBufferData);
-         const source = audioContextRef.current.createBufferSource();
-         source.buffer = audioBuffer;
-         source.connect(audioContextRef.current.destination);
-         source.start();
-         source.onended = () => setIsSpeaking(false);
-         return; // Success with Gemini
-      }
-    } catch (e) {
-      console.warn("Gemini TTS failed, falling back to browser TTS");
+      recognition.onresult = (event: any) => {
+        const transcript = Array.from(event.results)
+          .map((result: any) => result[0])
+          .map((result: any) => result.transcript)
+          .join('');
+        
+        setInput(transcript);
+      };
+
+      recognition.onerror = (event: any) => {
+        console.error("Speech recognition error", event.error);
+        setIsListening(false);
+      };
+
+      recognitionRef.current = recognition;
+    }
+  }, []);
+
+  const toggleListening = () => {
+    if (!recognitionRef.current) {
+      alert(STRINGS.chat.noVoice);
+      return;
     }
 
-    // 2. Fallback to Browser TTS
+    if (isListening) {
+      recognitionRef.current.stop();
+    } else {
+      // When user starts speaking, we assume they want to hear the response
+      setIsSoundOn(true); 
+      window.speechSynthesis.cancel(); // Stop any current speech
+      setInput("");
+      recognitionRef.current.start();
+    }
+  };
+
+  const speak = (text: string) => {
+    if (!isSoundOn) return;
+    
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'zh-CN';
-    utterance.rate = 0.95; 
-    utterance.pitch = 1.0; 
+    utterance.rate = 1.0; 
 
     const voices = window.speechSynthesis.getVoices();
-    
-    // Priority list for Chinese Gentle voices
+    // Priority list for Chinese voices
     const zhPriorities = [
-      'Xiaoxiao', // Microsoft Neural (Very gentle)
-      'Huihui',   // Microsoft Standard
-      'Google 普通话', // Google Standard
-      'Ting-Ting', // macOS Standard
-      'zh-CN'      // Fallback
+      'Xiaoxiao', 'Huihui', 'Google 普通话', 'Ting-Ting', 'zh-CN'
     ];
-    
     const targetVoice = voices.find(v => zhPriorities.some(p => v.name.includes(p)) || v.lang === 'zh-CN');
     if (targetVoice) utterance.voice = targetVoice;
 
+    utterance.onstart = () => setIsSpeaking(true);
     utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+    
     window.speechSynthesis.speak(utterance);
   };
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
     window.speechSynthesis.cancel();
+    if (isListening && recognitionRef.current) recognitionRef.current.stop();
 
     const userText = input.trim();
     setInput(""); 
@@ -143,7 +147,12 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({ problem, isOpen, o
       speak(aiResponseText);
 
     } catch (e) {
-       // Error
+      const errorMsg: ChatMessage = { 
+        role: 'model', 
+        text: "抱歉，网络出小差了，请重试。", 
+        timestamp: Date.now() 
+      };
+      setMessages(prev => [...prev, errorMsg]);
     } finally {
       setIsLoading(false);
     }
@@ -156,38 +165,6 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({ problem, isOpen, o
     }
   };
 
-  const toggleListening = () => {
-    if (isListening) {
-      setIsListening(false);
-      return;
-    }
-
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-
-    if (!SpeechRecognition) {
-      alert(STRINGS.chat.noVoice);
-      return;
-    }
-
-    window.speechSynthesis.cancel();
-    const recognition = new SpeechRecognition();
-    recognition.lang = 'zh-CN';
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
-
-    recognition.onstart = () => setIsListening(true);
-    recognition.onend = () => setIsListening(false);
-
-    recognition.onresult = (event: any) => {
-      const transcript = event.results[0][0].transcript;
-      if (transcript) {
-        setInput(prev => prev + (prev ? ' ' : '') + transcript);
-      }
-    };
-
-    recognition.start();
-  };
-
   if (!isOpen) return null;
 
   return (
@@ -195,16 +172,21 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({ problem, isOpen, o
       <div className="bg-white/95 w-full h-full md:w-[400px] md:h-[600px] md:rounded-3xl flex flex-col shadow-2xl border border-white/50 backdrop-blur-xl overflow-hidden animate-slide-up">
         
         {/* Header */}
-        <div className="p-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white flex justify-between items-center shadow-md">
+        <div className="p-4 bg-gradient-to-r from-blue-600 to-cyan-600 text-white flex justify-between items-center shadow-md">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center text-xl">👩‍🏫</div>
-            <h3 className="font-bold text-lg">{STRINGS.chat.title}</h3>
+            <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center text-xl">🤖</div>
+            <h3 className="font-bold text-lg">DeepSeek 助教</h3>
           </div>
           
           <div className="flex items-center gap-2">
             <button 
-              onClick={() => setIsSoundOn(!isSoundOn)} 
+              onClick={() => {
+                const newState = !isSoundOn;
+                setIsSoundOn(newState);
+                if (!newState) window.speechSynthesis.cancel();
+              }} 
               className="hover:bg-white/20 p-1.5 rounded-full transition-colors"
+              title="朗读开关"
             >
               {isSoundOn ? (
                 <span className={isSpeaking ? "animate-pulse text-yellow-300" : ""}>🔊</span>
@@ -223,9 +205,9 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({ problem, isOpen, o
           {messages.map((msg, idx) => (
             <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
               <div 
-                className={`max-w-[80%] p-3 rounded-2xl shadow-sm text-sm md:text-base leading-relaxed ${
+                className={`max-w-[85%] p-3 rounded-2xl shadow-sm text-sm md:text-base leading-relaxed ${
                   msg.role === 'user' 
-                    ? 'bg-indigo-600 text-white rounded-br-none' 
+                    ? 'bg-blue-600 text-white rounded-br-none' 
                     : 'bg-white text-gray-900 border border-gray-200 rounded-bl-none'
                 }`}
               >
@@ -235,16 +217,12 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({ problem, isOpen, o
           ))}
           {isLoading && (
             <div className="flex justify-start">
-              <div className="bg-white border border-gray-200 p-3 rounded-2xl rounded-bl-none shadow-sm flex gap-1">
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+              <div className="bg-white border border-gray-200 p-3 rounded-2xl rounded-bl-none shadow-sm flex gap-1 items-center">
+                <span className="text-xs text-gray-400 mr-2">DeepSeek 思考中</span>
+                <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
               </div>
-            </div>
-          )}
-          {isListening && (
-             <div className="flex justify-center items-center py-2 animate-pulse text-indigo-600 font-bold">
-              🎤 {STRINGS.chat.listening}
             </div>
           )}
           <div ref={messagesEndRef} />
@@ -252,17 +230,27 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({ problem, isOpen, o
 
         {/* Input Area */}
         <div className="p-4 bg-white border-t border-gray-200">
+          
+          {/* Voice Status Indicator */}
+          {isListening && (
+            <div className="mb-2 text-center text-sm text-red-500 font-bold animate-pulse">
+               🎤 {STRINGS.chat.listening}
+            </div>
+          )}
+
           <div className="flex gap-2 items-end">
-            <button
+            
+            {/* Mic Button */}
+            <button 
               onClick={toggleListening}
-              disabled={isLoading || isListening}
-              className={`w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-md border ${
+              className={`w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-md flex-shrink-0 ${
                 isListening 
-                  ? 'bg-red-100 text-red-500 border-red-300 scale-110' 
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border-gray-200'
+                  ? 'bg-red-500 text-white animate-pulse ring-4 ring-red-200' 
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
+              title="点击说话"
             >
-               🎤
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
             </button>
 
             <input
@@ -270,14 +258,15 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({ problem, isOpen, o
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={STRINGS.chat.placeholder}
+              placeholder={isListening ? STRINGS.chat.speakPrompt : STRINGS.chat.placeholder}
               disabled={isLoading}
-              className="flex-1 border border-gray-300 bg-white text-gray-900 placeholder-gray-400 rounded-2xl px-4 py-2 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all min-h-[40px]"
+              className="flex-1 border border-gray-300 bg-white text-gray-900 placeholder-gray-400 rounded-2xl px-4 py-2 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all min-h-[40px]"
             />
+            
             <button 
               onClick={handleSend} 
               disabled={isLoading || !input.trim()}
-              className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white w-10 h-10 rounded-full flex items-center justify-center transition-colors shadow-md"
+              className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white w-10 h-10 rounded-full flex items-center justify-center transition-colors shadow-md flex-shrink-0"
             >
               <svg className="w-5 h-5 translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
             </button>

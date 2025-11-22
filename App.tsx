@@ -4,6 +4,7 @@ import { generateProblem, validateEquation, checkAnswer } from './services/gemin
 import { Button } from './components/Button';
 import { ProgressBar } from './components/ProgressBar';
 import { Character } from './components/Character';
+import { ChatAssistant } from './components/ChatAssistant';
 import { STRINGS } from './locales';
 
 export default function App() {
@@ -24,6 +25,9 @@ export default function App() {
   // Feedback state
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState<'info' | 'error' | 'success'>('info');
+
+  // Chat State
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   const currentProblem = currentIndex >= 0 && currentIndex < history.length ? history[currentIndex] : null;
 
@@ -64,6 +68,7 @@ export default function App() {
     setUserAnswer("");
     setMessage("");
     setMessageType('info');
+    // We don't close chat automatically to let user continue asking questions
   };
 
   // --- Navigation Logic ---
@@ -148,6 +153,7 @@ export default function App() {
     setHistory([]);
     setCurrentIndex(-1);
     setMessage("");
+    setIsChatOpen(false);
   };
 
   // --- Render Helpers ---
@@ -391,6 +397,28 @@ export default function App() {
             </div>
           </div>
         )}
+
+        {/* AI Chat Floating Button */}
+        {step > GameStep.MENU && currentProblem && (
+           <>
+             <div className="fixed bottom-6 right-6 z-50">
+               <button 
+                 onClick={() => setIsChatOpen(true)}
+                 className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white rounded-full p-4 shadow-xl transition-transform hover:scale-110 flex items-center gap-2 animate-pulse-glow border-2 border-white"
+               >
+                 <span className="text-3xl">🤖</span>
+                 <span className="font-bold hidden md:inline">AI 帮帮我</span>
+               </button>
+             </div>
+             
+             <ChatAssistant 
+               problem={currentProblem} 
+               isOpen={isChatOpen} 
+               onClose={() => setIsChatOpen(false)} 
+             />
+           </>
+        )}
+
       </main>
     </div>
   );

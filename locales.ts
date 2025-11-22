@@ -42,9 +42,10 @@ export const STRINGS = {
   fullSolution: "参考解析：",
   chat: {
     title: "AI 辅导老师",
-    intro: "你好！我是你的专属 AI 辅导老师。关于这道题，哪里不懂都可以问我哦！",
-    placeholder: "请输入你的问题...",
-    listening: "正在听你说...",
+    intro: "你好！我是DeepSeek驱动的智能助教。这道题哪里不懂，可以问我哦！",
+    placeholder: "输入问题或点击麦克风提问...",
+    listening: "正在听...",
+    speakPrompt: "请说话...",
     noVoice: "抱歉，你的浏览器不支持语音识别功能。"
   }
 };
