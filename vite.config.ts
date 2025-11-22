@@ -4,6 +4,14 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   server: {
-    port: 3000
+    port: 3000,
+    proxy: {
+      // Proxy /api/deepseek to https://api.deepseek.com
+      '/api/deepseek': {
+        target: 'https://api.deepseek.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/deepseek/, '')
+      }
+    }
   }
 });

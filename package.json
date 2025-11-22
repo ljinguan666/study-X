@@ -3,14 +3,12 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "packageManager": "yarn@1.22.22",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
-    "@google/genai": "^1.30.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
