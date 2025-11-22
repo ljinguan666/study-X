@@ -1,0 +1,18 @@
+[build]
+  publish = "dist"
+  command = "yarn build"
+  functions = "netlify/functions"
+
+# Proxy API requests to DeepSeek via Netlify Function
+[[redirects]]
+  from = "/api/deepseek/chat/completions"
+  to = "/.netlify/functions/deepseek?path=/chat/completions"
+  status = 200
+  force = true
+
+# SPA fallback - serve index.html for all routes
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
