@@ -1,127 +1,209 @@
+import { GoogleGenAI, Modality, Type } from "@google/genai";
 import { Difficulty, MathProblem, CheckResult, ChatMessage } from "../types";
 import { generateOfflineProblem } from "./problemBank";
 import { checkEquationOffline } from "./mathEngine";
 
-// Use the user provided DeepSeek Key
-const DEEPSEEK_API_KEY = "sk-78af19cfbdac407ab01ec7b33a260201";
+// Safely retrieve API Key using Vite's define replacement.
+// process.env.API_KEY is replaced with the actual string or "" during build.
+const apiKey = process.env.API_KEY || "";
 
-// CRITICAL: We use a relative path '/api/deepseek' here.
-// This triggers the proxy configured in vite.config.ts (for local dev),
-// vercel.json (for Vercel), or netlify.toml (for Netlify).
-const DEEPSEEK_URL = "/api/deepseek/chat/completions";
+// Initialize Google GenAI Client safely
+// If apiKey is empty, use a dummy string to allow the app to load offline.
+// Actual API calls will check if apiKey is valid/empty before proceeding.
+const ai = new GoogleGenAI({ apiKey: apiKey || "dummy_key_for_init" });
 
-// --- Offline Core Functions (Fast & Reliable) ---
+// --- Helper: Clean JSON string from Markdown ---
+const cleanJSON = (text: string): string => {
+  let clean = text.replace(/```json\s*/g, "").replace(/```\s*/g, "");
+  return clean.trim();
+};
+
+// --- Helper: Decode Base64 Audio ---
+export const decodeAudioData = async (
+  base64String: string, 
+  audioContext: AudioContext
+): Promise<AudioBuffer> => {
+  const binaryString = atob(base64String);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return audioContext.decodeAudioData(bytes.buffer);
+};
+
+// --- Core: Generate Problem ---
 
 export const generateProblem = async (difficulty: Difficulty, seenSignatures: Set<string>): Promise<MathProblem> => {
-  // Simulate a short "thinking" delay for better UX, but strictly offline logic
-  await new Promise(resolve => setTimeout(resolve, 400));
-  return generateOfflineProblem(difficulty, seenSignatures);
+  // Fallback to offline immediately if no API Key is detected (safe failover)
+  if (!apiKey || apiKey === "dummy_key_for_init") {
+    console.warn("No API Key found, using offline mode.");
+    return generateOfflineProblem(difficulty, seenSignatures);
+  }
+
+  try {
+    return await generateOnlineProblem(difficulty, seenSignatures);
+  } catch (error) {
+    console.warn("Online generation failed, falling back to offline bank.", error);
+    return generateOfflineProblem(difficulty, seenSignatures);
+  }
 };
+
+const generateOnlineProblem = async (difficulty: Difficulty, seenSignatures: Set<string>): Promise<MathProblem> => {
+  let difficultyPrompt = "";
+  switch (difficulty) {
+    case Difficulty.EASY:
+      difficultyPrompt = "难度：简单。一步计算。场景：基础购物找零、简单的行程（速度x时间）、物品分配。方程形如 ax=b 或 x+a=b。";
+      break;
+    case Difficulty.MEDIUM:
+      difficultyPrompt = "难度：中等。两步逻辑。场景：打车计费（起步价+里程）、网购（商品+运费）、团体门票。方程形如 ax+b=c。";
+      break;
+    case Difficulty.HARD:
+      difficultyPrompt = "难度：困难。复杂逻辑。场景：行程问题（相遇/追及）、工程合作、方案比较（储蓄/话费套餐）。方程形如 ax+b = cx+d 或 (a+b)x = c。";
+      break;
+  }
+
+  const prompt = `你是一个富有创意的小学数学老师。请编写一道贴近生活实际的一元一次方程应用题。
+  
+  要求：
+  1. ${difficultyPrompt}
+  2. 必须包含以下生活场景之一：购物消费、行程问题（开车/跑步）、打车/计费标准、工程效率。
+  3. 题目描述要自然、具体（例如包含具体的人物、地点、商品名称）。
+  4. 简体中文。
+  5. 必须严格返回 JSON。
+  6. 解必须是整数。
+  
+  JSON Schema:
+  {
+    "story": string,
+    "question": string,
+    "unknownDefinition": string (e.g. "设...为 x"),
+    "equation": string,
+    "answer": number,
+    "hint": string
+  }`;
+
+  const response = await ai.models.generateContent({
+    model: 'gemini-2.5-flash',
+    contents: prompt,
+    config: {
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          story: { type: Type.STRING },
+          question: { type: Type.STRING },
+          unknownDefinition: { type: Type.STRING },
+          equation: { type: Type.STRING },
+          answer: { type: Type.NUMBER },
+          hint: { type: Type.STRING },
+        },
+        required: ['story', 'question', 'unknownDefinition', 'equation', 'answer', 'hint']
+      }
+    }
+  });
+
+  const text = response.text;
+  if (!text) throw new Error("Empty response from Gemini");
+
+  const parsed = JSON.parse(cleanJSON(text));
+
+  const signature = `AI-${difficulty}-${parsed.answer}-${parsed.equation.replace(/\s/g,'')}`;
+
+  if (seenSignatures.has(signature)) {
+      throw new Error("Duplicate AI problem");
+  }
+
+  return {
+    id: Date.now().toString(),
+    signature: signature,
+    story: parsed.story,
+    question: parsed.question,
+    unknownDefinition: parsed.unknownDefinition,
+    equation: parsed.equation,
+    answer: parsed.answer,
+    hint: parsed.hint
+  };
+};
+
+// --- Offline Check Functions ---
 
 export const validateEquation = async (
   problem: MathProblem, 
   userEquation: string
 ): Promise<CheckResult> => {
-  // Pure offline validation
   await new Promise(resolve => setTimeout(resolve, 200));
   return checkEquationOffline(problem.answer, userEquation);
 };
 
 export const checkAnswer = (problem: MathProblem, userAnswer: number): CheckResult => {
-  // Allow small floating point tolerance
   const isCorrect = Math.abs(problem.answer - userAnswer) < 0.01;
-  
-  const feedback = isCorrect 
-    ? "答案正确！"
-    : "答案不太对，请再算一下。";
-    
-  return { correct: isCorrect, feedback };
+  return { 
+    correct: isCorrect, 
+    feedback: isCorrect ? "答案正确！" : "答案不太对，请再算一下。" 
+  };
 };
 
-// --- DeepSeek AI Online Functions (Safe Mode) ---
+// --- AI Chat & TTS Functions ---
 
 export const getAIExplanation = async (
   problem: MathProblem,
   history: ChatMessage[],
   userQuestion: string
 ): Promise<string> => {
-  // Setup a timeout controller. If API takes > 8 seconds, we abort to save UX.
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 8000);
+  if (!apiKey || apiKey === "dummy_key_for_init") return "API Key 未配置，无法连接 AI 老师。";
 
   try {
-    const systemInstruction = `你是一位友善、耐心的小学数学辅导老师。
+    const systemPrompt = `你是一位友善、耐心的小学数学辅导老师。
+    当前题目：${problem.story}
+    问题：${problem.question}
+    方程：${problem.equation}
+    答案：${problem.answer}
+    请循循善诱，不要直接给答案。回复简短（3-5句）。`;
 
-当前题目详情：
-情景：${problem.story}
-问题：${problem.question}
-未知数定义：${problem.unknownDefinition}
-正确方程：${problem.equation}
-答案：${problem.answer}
-
-你的任务是回答学生关于这道题的问题。
-1. 请使用简体中文。
-2. 态度要鼓励、亲切，像一位大朋友。
-3. 不要直接给出最终答案，而是循循善诱，引导学生思考。
-4. 解释要通俗易懂，避免复杂的术语。
-5. 如果学生不知道怎么列方程，请分析题目中的“等量关系”。
-6. 回复请简短，控制在3-5句话以内。`;
-
-    const messages = [
-      { role: "system", content: systemInstruction },
+    // Convert chat history format
+    let contents = [
+      { role: 'user', parts: [{ text: systemPrompt }] },
       ...history.map(msg => ({
-        role: msg.role === 'model' ? 'assistant' : 'user',
-        content: msg.text
+        role: msg.role === 'model' ? 'model' : 'user',
+        parts: [{ text: msg.text }]
       })),
-      { role: "user", content: userQuestion }
+      { role: 'user', parts: [{ text: userQuestion }] }
     ];
 
-    const response = await fetch(DEEPSEEK_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${DEEPSEEK_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: "deepseek-chat",
-        messages: messages,
-        temperature: 0.7,
-        max_tokens: 500
-      }),
-      signal: controller.signal // Attach abort signal
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: contents
     });
 
-    clearTimeout(timeoutId); // Request succeeded, clear timeout
+    return response.text || "抱歉，我走神了。";
+  } catch (error) {
+    console.error("Gemini Chat Error:", error);
+    return "网络有点卡，AI 老师暂时听不见。";
+  }
+};
 
-    if (!response.ok) {
-      // Handle 404 specifically (often means proxy not set up)
-      if (response.status === 404) {
-         console.warn("DeepSeek Proxy Not Found");
-         return "网络通道未配置 (Proxy 404)，无法连接 AI 老师。不过没关系，你可以自己尝试解题！";
-      }
-      throw new Error(`API Error: ${response.statusText}`);
-    }
+export const getGeminiTTS = async (text: string): Promise<string | null> => {
+  if (!apiKey || apiKey === "dummy_key_for_init") return null;
 
-    const data = await response.json();
-    return data.choices?.[0]?.message?.content || "抱歉，我走神了，请再说一遍。";
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash-preview-tts",
+      contents: [{ parts: [{ text: text }] }],
+      config: {
+        responseModalities: [Modality.AUDIO],
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: { voiceName: 'Kore' }, // 'Kore' is a gentle female voice
+          },
+        },
+      },
+    });
 
-  } catch (error: any) {
-    clearTimeout(timeoutId); // Ensure timeout is cleared on error
-    console.error("DeepSeek AI Request Failed:", error);
-    
-    // Return friendly fallbacks instead of crashing or throwing
-    if (error.name === 'AbortError') {
-      return "网络有点卡，AI 老师暂时听不见。别担心，你先试着自己做做看？";
-    }
-    
-    if (error.message === "Proxy Config Missing") {
-      return "⚠️ 配置提示：请将项目部署到 Vercel 或 Netlify 以启用 API 代理。";
-    }
-    
-    if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
-       return "网络连接似乎断开了。请检查网络，或者直接尝试做下一题吧！";
-    }
-
-    return "AI 老师现在有点忙（连接超时），不过我相信你自己也能解出来！加油！";
+    const audioData = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+    return audioData || null;
+  } catch (error) {
+    console.error("Gemini TTS Error:", error);
+    return null;
   }
 };

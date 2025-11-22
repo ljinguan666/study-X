@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChatMessage, MathProblem } from '../types';
-import { getAIExplanation } from '../services/geminiService';
+import { getAIExplanation, getGeminiTTS, decodeAudioData } from '../services/geminiService';
 import { STRINGS } from '../locales';
 
 interface ChatAssistantProps {
@@ -9,11 +9,12 @@ interface ChatAssistantProps {
   onClose: () => void;
 }
 
-// Type definition for Web Speech API
 declare global {
   interface Window {
     webkitSpeechRecognition: any;
     SpeechRecognition: any;
+    AudioContext: any;
+    webkitAudioContext: any;
   }
 }
 
@@ -23,15 +24,18 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({ problem, isOpen, o
   const [isLoading, setIsLoading] = useState(false);
   const [isSoundOn, setIsSoundOn] = useState(false); 
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [isListening, setIsListening] = useState(false); // STT state
+  const [isListening, setIsListening] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
+  
+  // Audio Context for Gemini TTS
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
 
-  // Initialize with greeting
   useEffect(() => {
     if (isOpen && messages.length === 0) {
-      const introText = "你好！我是DeepSeek驱动的智能助教。这道题哪里不懂，可以直接跟我说哦！";
+      const introText = "你好！我是 Gemini 驱动的智能助教。这道题哪里不懂，可以直接跟我说哦！";
       setMessages([
         {
           role: 'model',
@@ -39,16 +43,16 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({ problem, isOpen, o
           timestamp: Date.now()
         }
       ]);
+      // Try to play greeting if sound is on (might be blocked by autoplay policy if no interaction yet)
+      if(isSoundOn) playGeminiAudio(introText);
     }
   }, [isOpen, problem]);
 
-  // Reset chat when problem changes
   useEffect(() => {
     setMessages([]);
-    window.speechSynthesis.cancel();
+    stopAudio();
   }, [problem]);
 
-  // Auto-scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isOpen, isListening]);
@@ -70,7 +74,6 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({ problem, isOpen, o
           .map((result: any) => result[0])
           .map((result: any) => result.transcript)
           .join('');
-        
         setInput(transcript);
       };
 
@@ -92,40 +95,80 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({ problem, isOpen, o
     if (isListening) {
       recognitionRef.current.stop();
     } else {
-      // When user starts speaking, we assume they want to hear the response
+      // Ensure AudioContext is resumed on user interaction
+      if (audioContextRef.current?.state === 'suspended') {
+        audioContextRef.current.resume();
+      }
       setIsSoundOn(true); 
-      window.speechSynthesis.cancel(); // Stop any current speech
+      stopAudio();
       setInput("");
       recognitionRef.current.start();
     }
   };
 
-  const speak = (text: string) => {
+  const stopAudio = () => {
+    if (audioSourceRef.current) {
+      try {
+        audioSourceRef.current.stop();
+      } catch (e) {
+        // Ignore errors if already stopped
+      }
+      audioSourceRef.current = null;
+    }
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+    setIsSpeaking(false);
+  };
+
+  const playGeminiAudio = async (text: string) => {
     if (!isSoundOn) return;
-    
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'zh-CN';
-    utterance.rate = 1.0; 
+    stopAudio();
+    setIsSpeaking(true);
 
-    const voices = window.speechSynthesis.getVoices();
-    // Priority list for Chinese voices
-    const zhPriorities = [
-      'Xiaoxiao', 'Huihui', 'Google 普通话', 'Ting-Ting', 'zh-CN'
-    ];
-    const targetVoice = voices.find(v => zhPriorities.some(p => v.name.includes(p)) || v.lang === 'zh-CN');
-    if (targetVoice) utterance.voice = targetVoice;
+    // 1. Try Gemini TTS (Network)
+    const base64Audio = await getGeminiTTS(text);
 
-    utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
-    
-    window.speechSynthesis.speak(utterance);
+    if (base64Audio) {
+      try {
+        if (!audioContextRef.current) {
+          audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        const ctx = audioContextRef.current;
+        if (!ctx) {
+          console.error("AudioContext not available");
+          return;
+        }
+        
+        const buffer = await decodeAudioData(base64Audio, ctx);
+        
+        const source = ctx.createBufferSource();
+        source.buffer = buffer;
+        source.connect(ctx.destination);
+        source.onended = () => setIsSpeaking(false);
+        source.start(0);
+        audioSourceRef.current = source;
+        return; // Success
+      } catch (e) {
+        console.error("Audio Decode Error", e);
+      }
+    }
+
+    // 2. Fallback to Browser TTS if Gemini fails or returns null
+    if (window.speechSynthesis) {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'zh-CN';
+      utterance.onend = () => setIsSpeaking(false);
+      utterance.onerror = () => setIsSpeaking(false);
+      window.speechSynthesis.speak(utterance);
+    } else {
+      setIsSpeaking(false);
+    }
   };
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
-    window.speechSynthesis.cancel();
+    stopAudio();
     if (isListening && recognitionRef.current) recognitionRef.current.stop();
 
     const userText = input.trim();
@@ -144,7 +187,7 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({ problem, isOpen, o
         timestamp: Date.now() 
       };
       setMessages(prev => [...prev, aiMsg]);
-      speak(aiResponseText);
+      playGeminiAudio(aiResponseText);
 
     } catch (e) {
       const errorMsg: ChatMessage = { 
@@ -175,7 +218,7 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({ problem, isOpen, o
         <div className="p-4 bg-gradient-to-r from-blue-600 to-cyan-600 text-white flex justify-between items-center shadow-md">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center text-xl">🤖</div>
-            <h3 className="font-bold text-lg">DeepSeek 助教</h3>
+            <h3 className="font-bold text-lg">Gemini 助教</h3>
           </div>
           
           <div className="flex items-center gap-2">
@@ -183,7 +226,7 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({ problem, isOpen, o
               onClick={() => {
                 const newState = !isSoundOn;
                 setIsSoundOn(newState);
-                if (!newState) window.speechSynthesis.cancel();
+                if (!newState) stopAudio();
               }} 
               className="hover:bg-white/20 p-1.5 rounded-full transition-colors"
               title="朗读开关"
@@ -218,7 +261,7 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({ problem, isOpen, o
           {isLoading && (
             <div className="flex justify-start">
               <div className="bg-white border border-gray-200 p-3 rounded-2xl rounded-bl-none shadow-sm flex gap-1 items-center">
-                <span className="text-xs text-gray-400 mr-2">DeepSeek 思考中</span>
+                <span className="text-xs text-gray-400 mr-2">Gemini 思考中</span>
                 <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
                 <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
                 <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>

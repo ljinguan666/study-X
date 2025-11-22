@@ -100,10 +100,12 @@
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
     "react/": "https://aistudiocdn.com/react@^19.2.0/",
     "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.1",
-    "vite": "https://aistudiocdn.com/vite@^7.2.4"
+    "vite": "https://aistudiocdn.com/vite@^7.2.4",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0"
   }
 }
 </script>
+<link rel="stylesheet" href="/index.css">
 </head>
   <body>
     <canvas id="bg-canvas"></canvas>
@@ -156,7 +158,7 @@
             this.dy = (Math.random() - 0.5) * 0.5;
             this.size = Math.random() * 3 + 1;
             // 15% chance to be a symbol
-            this.symbol = Math.random() > 0.85 ? symbols[Math.floor(Math.random() * symbols.length)] : null;
+            this.symbol = Math.random() * 100 > 85 ? symbols[Math.floor(Math.random() * symbols.length)] : null;
             this.color = colors[Math.floor(Math.random() * colors.length)];
             this.opacity = Math.random() * 0.5 + 0.1;
           }

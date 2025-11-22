@@ -25,12 +25,33 @@ exports.handler = async (event, context) => {
   }
 
   try {
-    // Extract path from query string or use default
-    const path = event.queryStringParameters?.path || '/chat/completions';
-    const url = `https://api.deepseek.com${path}`;
+    // The path should be /chat/completions
+    // Netlify redirects will send the request here, so we use the default path
+    const url = 'https://api.deepseek.com/chat/completions';
 
     // Get Authorization header from the request
+    // The client sends: Authorization: Bearer <API_KEY>
     const authHeader = event.headers.authorization || event.headers.Authorization || '';
+    
+    if (!authHeader) {
+      console.error('No Authorization header found');
+      return {
+        statusCode: 401,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        },
+        body: JSON.stringify({ error: 'Missing Authorization header' })
+      };
+    }
+    
+    // Log for debugging (remove in production or use environment variable)
+    console.log('Proxying request to DeepSeek:', {
+      method: event.httpMethod,
+      hasAuth: !!authHeader,
+      bodyLength: event.body?.length || 0,
+      url: url
+    });
 
     // Forward the request to DeepSeek API
     const response = await fetch(url, {
@@ -42,7 +63,13 @@ exports.handler = async (event, context) => {
       body: event.body
     });
 
+    // Get response data (could be error or success)
     const data = await response.json();
+
+    // Log error responses for debugging
+    if (!response.ok) {
+      console.error(`DeepSeek API Error ${response.status}:`, JSON.stringify(data));
+    }
 
     return {
       statusCode: response.status,
