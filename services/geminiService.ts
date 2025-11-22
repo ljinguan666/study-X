@@ -1,16 +1,40 @@
-import { GoogleGenAI, Modality, Type } from "@google/genai";
 import { Difficulty, MathProblem, CheckResult, ChatMessage } from "../types";
 import { generateOfflineProblem } from "./problemBank";
 import { checkEquationOffline } from "./mathEngine";
 
-// Safely retrieve API Key using Vite's define replacement.
-// process.env.API_KEY is replaced with the actual string or "" during build.
-const apiKey = process.env.API_KEY || "";
+// Safely retrieve API Key using Vite's environment variables
+// VITE_API_KEY is available at build time via import.meta.env
+const apiKey = import.meta.env.VITE_API_KEY || "";
 
-// Initialize Google GenAI Client safely
-// If apiKey is empty, use a dummy string to allow the app to load offline.
-// Actual API calls will check if apiKey is valid/empty before proceeding.
-const ai = new GoogleGenAI({ apiKey: apiKey || "dummy_key_for_init" });
+// Helper function to call DeepSeek API via Netlify function
+const callDeepSeekAPI = async (messages: Array<{ role: string; content: string }>) => {
+  if (!apiKey) {
+    throw new Error("API Key not configured");
+  }
+
+  // Use Netlify function proxy for DeepSeek API
+  const response = await fetch("/.netlify/functions/deepseek", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model: "deepseek-chat",
+      messages: messages,
+      temperature: 0.7,
+      max_tokens: 1000
+    })
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: "Unknown error" }));
+    throw new Error(error.error || `API request failed with status ${response.status}`);
+  }
+
+  const data = await response.json();
+  return data.choices?.[0]?.message?.content || "";
+};
 
 // --- Helper: Clean JSON string from Markdown ---
 const cleanJSON = (text: string): string => {
@@ -36,7 +60,7 @@ export const decodeAudioData = async (
 
 export const generateProblem = async (difficulty: Difficulty, seenSignatures: Set<string>): Promise<MathProblem> => {
   // Fallback to offline immediately if no API Key is detected (safe failover)
-  if (!apiKey || apiKey === "dummy_key_for_init") {
+  if (!apiKey) {
     console.warn("No API Key found, using offline mode.");
     return generateOfflineProblem(difficulty, seenSignatures);
   }
@@ -83,30 +107,16 @@ const generateOnlineProblem = async (difficulty: Difficulty, seenSignatures: Set
     "hint": string
   }`;
 
-  const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
-    contents: prompt,
-    config: {
-      responseMimeType: 'application/json',
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          story: { type: Type.STRING },
-          question: { type: Type.STRING },
-          unknownDefinition: { type: Type.STRING },
-          equation: { type: Type.STRING },
-          answer: { type: Type.NUMBER },
-          hint: { type: Type.STRING },
-        },
-        required: ['story', 'question', 'unknownDefinition', 'equation', 'answer', 'hint']
-      }
+  const responseText = await callDeepSeekAPI([
+    {
+      role: "user",
+      content: prompt
     }
-  });
+  ]);
 
-  const text = response.text;
-  if (!text) throw new Error("Empty response from Gemini");
+  if (!responseText) throw new Error("Empty response from DeepSeek");
 
-  const parsed = JSON.parse(cleanJSON(text));
+  const parsed = JSON.parse(cleanJSON(responseText));
 
   const signature = `AI-${difficulty}-${parsed.answer}-${parsed.equation.replace(/\s/g,'')}`;
 
@@ -151,7 +161,7 @@ export const getAIExplanation = async (
   history: ChatMessage[],
   userQuestion: string
 ): Promise<string> => {
-  if (!apiKey || apiKey === "dummy_key_for_init") return "API Key 未配置，无法连接 AI 老师。";
+  if (!apiKey) return "API Key 未配置，无法连接 AI 老师。";
 
   try {
     const systemPrompt = `你是一位友善、耐心的小学数学辅导老师。
@@ -162,48 +172,26 @@ export const getAIExplanation = async (
     请循循善诱，不要直接给答案。回复简短（3-5句）。`;
 
     // Convert chat history format
-    let contents = [
-      { role: 'user', parts: [{ text: systemPrompt }] },
+    const messages = [
+      { role: "system", content: systemPrompt },
       ...history.map(msg => ({
-        role: msg.role === 'model' ? 'model' : 'user',
-        parts: [{ text: msg.text }]
+        role: msg.role === 'model' ? 'assistant' : 'user',
+        content: msg.text
       })),
-      { role: 'user', parts: [{ text: userQuestion }] }
+      { role: "user", content: userQuestion }
     ];
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: contents
-    });
-
-    return response.text || "抱歉，我走神了。";
+    const responseText = await callDeepSeekAPI(messages);
+    return responseText || "抱歉，我走神了。";
   } catch (error) {
-    console.error("Gemini Chat Error:", error);
+    console.error("DeepSeek Chat Error:", error);
     return "网络有点卡，AI 老师暂时听不见。";
   }
 };
 
+// TTS using browser Web Speech API as fallback
 export const getGeminiTTS = async (text: string): Promise<string | null> => {
-  if (!apiKey || apiKey === "dummy_key_for_init") return null;
-
-  try {
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash-preview-tts",
-      contents: [{ parts: [{ text: text }] }],
-      config: {
-        responseModalities: [Modality.AUDIO],
-        speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: 'Kore' }, // 'Kore' is a gentle female voice
-          },
-        },
-      },
-    });
-
-    const audioData = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-    return audioData || null;
-  } catch (error) {
-    console.error("Gemini TTS Error:", error);
-    return null;
-  }
+  // Since DeepSeek doesn't have TTS, we return null
+  // The ChatAssistant can use browser's SpeechSynthesis API instead
+  return null;
 };
